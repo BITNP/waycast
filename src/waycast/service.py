@@ -113,6 +113,16 @@ class Service:
         while True:
             inp = await self.queue.get()
             try:
+                # No reachable output targets: the model could only emit an
+                # empty (or doomed) units list, so skip the real call instead
+                # of burning tokens for nothing.  The dropped input is
+                # recorded so operators can see it in /results.
+                if not self.catalog.output_names():
+                    self._last_results["last_skipped"] = {
+                        "reason": "no output module connected",
+                        "input": inp.model_dump(),
+                    }
+                    continue
                 res = await self.agent.ainvoke(inp)
                 self._last_results["last_result"] = res.model_dump()
             except Exception as exc:  # never kill the worker

@@ -31,6 +31,7 @@ Waycast 的核心（`src/`）只含本体：协议、Agent、hub、service、wir
 - **状态查询可选**：模块只有宣告 `status.enabled` 才获得 `status_<module>` 工具（经 capability-bridge middleware 暴露，非 MCP server）；无状态可查的模块不宣告，也不生成工具。
 - **JSON 输出优先，否则自动回退**：Pydantic schema 直接传给 `create_agent` 的 `response_format`，LangChain v1 的 `AutoStrategy` 自动探测——provider 原生支持结构化输出走 `ProviderStrategy`，否则回退 `ToolStrategy`（ADR-0003）。
 - **背压**：所有输入（无论来自哪个模块）进入同一个有界 `asyncio.Queue`，单消费者 worker 逐条处理；队列满时生产者阻塞（ADR-0006）。
+- **无输出模块时不空转**：worker 每次取输入前先看 capability catalog —— 没有已连接的输出模块时，直接丢弃该条输入（在 `/results` 记录 `last_skipped`），不调用真实模型；有输出模块后才执行 Invocation。
 - **连接 token**：`WAYCAST_HUB_TOKEN` 共享密钥，模块在 WebSocket 握手（query 参数）时提交，校验通过才受理（A8）。token 为空时关闭鉴权。
 
 ## 快速开始
@@ -96,7 +97,7 @@ uv run waycast serve
 
 - `WS /ws/modules` —— 模块连接唯一入口（所有输入经模块 `input` 帧进入）。
 - `GET /health` —— 健康检查，返回 `queue_size`。
-- `GET /results` —— 最近一次调用的完整结果（units、各派发的 OutputResult）、`pending_output_results`、已连接模块与队列大小。
+- `GET /results` —— 最近一次调用的完整结果（units、各派发的 OutputResult）、`pending_output_results`、已连接模块与队列大小；无输出模块时被跳过的输入记录在 `last_skipped`。
 
 ## 编写自己的模块
 

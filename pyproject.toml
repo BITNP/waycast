@@ -1,6 +1,6 @@
 [project]
 name = "waycast"
-version = "0.1.0"
+version = "0.2.0"
 description = "A pluggable agent service: unified input in, arbitrary combination of output-module units out, fire-and-forget delivery with immediate results feeding the next invocation."
 readme = "README.md"
 authors = [
@@ -15,6 +15,7 @@ dependencies = [
     "fastapi>=0.162.0",
     "uvicorn[standard]>=0.54.0",
     "httpx>=0.28.1",
+    "jsonschema>=4.23.0",
     "python-dotenv>=1.2.4",
     "pydantic>=2.14.1",
 ]

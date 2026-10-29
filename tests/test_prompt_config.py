@@ -1,79 +1,79 @@
-"""User-customizable Agent system prompt (waycast.toml) tests.
+"""User-customizable Agent system prompt (plain-text) tests.
 
-Covers TOML parsing, the default-prompt fallback when no config exists, and
-the concatenation of user instructions with the auto-generated catalog.
+Covers reading the whole plain-text file as the user part of the system
+prompt, the default-prompt fallback when no file exists, and the order:
+user prompt first, auto-generated catalog second.
 """
 
 from __future__ import annotations
 
-import os
-
 from waycast.agent import _build_system_prompt
 from waycast.demo import build_registry
-from waycast.prompt_config import AgentSystemPromptConfig, build_system_prompt_with_config
+from waycast.prompt_config import (
+    build_system_prompt_with_user,
+    read_user_system_prompt,
+)
 
 
-def test_missing_file_yields_empty_config(tmp_path):
-    cfg = AgentSystemPromptConfig.from_toml_path(tmp_path / "nope.toml")
-    assert cfg.is_empty()
+def test_missing_file_returns_none(tmp_path):
+    assert read_user_system_prompt(tmp_path / "nope.txt") is None
 
 
-def test_default_env_path_when_unset(tmp_path, monkeypatch):
-    # No WAYCAST_AGENT_CONFIG and no ./waycast.toml in cwd -> empty.
+def test_default_path_when_unset(tmp_path, monkeypatch):
+    # No WAYCAST_AGENT_CONFIG and no ./waycast.prompt.txt in cwd -> None.
     monkeypatch.delenv("WAYCAST_AGENT_CONFIG", raising=False)
     monkeypatch.chdir(tmp_path)
-    cfg = AgentSystemPromptConfig.from_toml_path()
-    assert cfg.is_empty()
+    assert read_user_system_prompt() is None
 
 
-def test_parses_all_fields(tmp_path):
-    p = tmp_path / "waycast.toml"
+def test_reads_full_plain_text_multiline(tmp_path):
+    p = tmp_path / "waycast.prompt.txt"
     p.write_text(
-        "[agent.system_prompt]\n"
-        'role = "weather-assistant"\n'
-        'scenario = "daily-clothing-tips"\n'
-        'custom_prefix = "check-weather-first"\n'
-        'custom_suffix = "be-concise"\n',
+        "你是一位天气预报助手。\n"
+        "\n"
+        "使用场景：每天早晨推送天气与穿衣建议。\n"
+        "\n"
+        "务必先调用天气工具再回复；回复要简洁，避免啰嗦。\n",
         encoding="utf-8",
     )
-    cfg = AgentSystemPromptConfig.from_toml_path(p)
-    assert cfg.role == "weather-assistant"
-    assert cfg.scenario == "daily-clothing-tips"
-    assert cfg.custom_prefix == "check-weather-first"
-    assert cfg.custom_suffix == "be-concise"
+    got = read_user_system_prompt(p)
+    assert got is not None
+    # whole file read verbatim, no field splitting
+    assert "你是一位天气预报助手" in got
+    assert "务必先调用天气工具再回复" in got
+    assert got.count("\n") >= 4
 
 
-def test_empty_config_leaves_default_prompt(tmp_path):
+def test_empty_file_returns_none(tmp_path):
+    p = tmp_path / "waycast.prompt.txt"
+    p.write_text("   \n  ", encoding="utf-8")
+    assert read_user_system_prompt(p) is None
+
+
+def test_missing_file_leaves_default_prompt(tmp_path):
     reg = build_registry()
     default = _build_system_prompt(reg)
-    empty = _build_system_prompt(reg, AgentSystemPromptConfig())
-    assert default == empty
+    unchanged = _build_system_prompt(reg, user_system_prompt=None)
+    assert default == unchanged
     assert "notify" in default
     assert "memory_log" in default
+    assert "You are the Waycast agent" in default
 
 
-def test_user_instructions_concatenated_with_catalog(tmp_path):
-    reg = build_registry()
-    cfg = AgentSystemPromptConfig(
-        role="天气助手",
-        scenario="推送穿衣建议",
-        custom_prefix="必须用中文",
-        custom_suffix="结尾写日志",
+def test_user_prompt_prepended_to_catalog(tmp_path):
+    user = "你是一位天气预报助手。\n每天早晨推送天气与穿衣建议。\n务必先调用天气工具再回复。"
+    prompt = build_system_prompt_with_user(
+        build_registry().describe_output_modules(), user
     )
-    prompt = build_system_prompt_with_config(
-        reg.describe_output_modules(), cfg
-    )
-    # catalog still present
+    # catalog still present, after the user text
     assert "notify" in prompt and "memory_log" in prompt
-    # ordered user instructions: prefix, role, scenario, suffix
-    assert prompt.index("必须用中文") < prompt.index("天气助手")
-    assert prompt.index("天气助手") < prompt.index("推送穿衣建议")
-    assert prompt.index("推送穿衣建议") < prompt.index("结尾写日志")
+    assert prompt.index("你是一位天气预报助手") < prompt.index("notify")
 
 
 def test_env_var_path_is_used(tmp_path, monkeypatch):
-    p = tmp_path / "custom.toml"
-    p.write_text('[agent.system_prompt]\nrole = "X"\n', encoding="utf-8")
+    p = tmp_path / "custom.txt"
+    p.write_text("只保留这一句。", encoding="utf-8")
     monkeypatch.setenv("WAYCAST_AGENT_CONFIG", str(p))
-    cfg = AgentSystemPromptConfig.from_toml_path()
-    assert cfg.role == "X"
+    got = read_user_system_prompt()
+    assert got is not None
+    assert "只保留这一句" in got

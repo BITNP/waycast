@@ -41,27 +41,29 @@ export WAYCAST_MODEL="gpt-4o-mini"                               # 可选，默�
 | `WAYCAST_HOST` | `0.0.0.0` | 监听地址 |
 | `WAYCAST_PORT` | `8000` | 监听端口 |
 | `WAYCAST_THREAD_ID` | `waycast-global` | 全局记忆的 thread_id |
-| `WAYCAST_AGENT_CONFIG` | `waycast.toml` | Agent 系统提示词自定义配置路径 |
+| `WAYCAST_AGENT_CONFIG` | `waycast.prompt.txt` | 用户系统提示词文件路径（纯文本） |
 
 ### 自定义 Agent 系统提示词
 
-可以按 **场景与角色** 定制 Agent 的系统提示词，配置通过项目根目录的 `waycast.toml`（或 `WAYCAST_AGENT_CONFIG` 指定的路径）提供：
+你可以直接写 **一整段纯文本** 作为 Agent 系统提示词的用户部分。默认读取项目根目录的 `waycast.prompt.txt`（可用环境变量 `WAYCAST_AGENT_CONFIG` 指定其他路径），文件内容原样读入，无需任何 TOML、转义或字段结构：
 
-```toml
-[agent.system_prompt]
-role = "一位天气预报助手"
-scenario = "每天早晨推送天气与穿衣建议"
-custom_prefix = "务必先调用天气工具再回复"
-custom_suffix = "回复要简洁，避免啰嗦"
+```text
+你是一位天气预报助手。
+
+使用场景：每天早晨推送天气与穿衣建议。
+
+注意：
+1. 务必先调用天气工具再回复；
+2. 回复要简洁，避免啰嗦。
 ```
 
-所有字段可选。你的定制内容会与自动生成的 **输出模块目录**（每个输出模块的 `describe` 与 JSON schema，见 `ModuleRegistry.describe_output_modules()`）拼接成最终系统提示词：
+文件内容会拼在自动生成的 **输出模块目录**（每个输出模块的 `describe` 与 JSON schema，见 `ModuleRegistry.describe_output_modules()`）**前面**，构成最终系统提示词：
 
 ```
-[自动生成的输出模块目录 + schema]  +  [custom_prefix]  +  [你的角色]  +  [使用场景]  +  [custom_suffix]
+[你的纯文本提示词]  +  [自动生成的输出模块目录 + schema + 规则]
 ```
 
-这样协议规范始终保留在提示词里（与 AGENTS.md「跨模块协议以 `waycast.protocols` 为唯一权威」一致），你只定制场景与角色部分。
+协议规范始终保留在提示词里（与 AGENTS.md「跨模块协议以 `waycast.protocols` 为唯一权威」一致）；你不必（也不应该）自己重复输出模块协议，只写角色、场景与行为要求即可。文件缺失或为空时，系统提示词保持默认不变。
 
 ### 启动服务
 
@@ -212,7 +214,7 @@ src/waycast/
   config.py        环境变量 / .env 配置，构建 ChatOpenAI
   demo.py          demo 装配：registry + 模块 + 模型 + Agent + Service
   modules.py       内置输入/输出模块
-  prompt_config.py 读取 waycast.toml，构建自定义系统提示词
+  prompt_config.py 读取纯文本用户提示词，与输出模块目录拼接
   protocols.py     统一协议：UnifiedInput / OutputModule / InputModule / ModuleRegistry
   registry.py      ModuleRegistry 再导出
   service.py       FastAPI + 有界背压队列 + 单消费者 worker

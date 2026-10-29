@@ -1,17 +1,37 @@
 # Waycast
 
-一个基于 LangChain v1 的可插拔 Agent 服务：任意输入模块产生统一输入，每一条输入触发一次 Agent 调用；Agent 通过与真实 LLM 的多轮工具调用，产出一个 JSON 对象——它是任意输出模块可接受内容的组合（也可以为空，表示什么都不做）；输出模块收到后立即返回一个结果（fire-and-forget），该结果会随下一轮输入一起进入下一轮调用。
+一个基于 LangChain v1 的微服务化 Agent：输入/输出模块是独立服务，通过 WebSocket 连接到 Agent（枢纽），以统一 JSON Wire 协议交换帧。每条输入触发一次 Agent 调用（Invocation）；Agent 通过多轮真实模型工具调用产出 JSON 输出单元列表（可为空），派发给已连接的输出模块连接（fire-and-forget）；每个派发立刻返回输出结果，该结果随下一轮输入一起进入下一轮调用（ADR-0002）。
 
-## 它解决什么问题
+## 架构
 
-Waycast 把“输入”和“输出”都做成可插拔模块，统一走一套协议：
+Waycast 的核心（`src/`）只含本体：协议、Agent、hub、service、wire 帧模型。模块一律作为网络客户端运行在进程外（ADR-0008），`src/` 中不存在任何 mock 或占位。
 
-- **输入模块**（Input module）把外部信号转成统一的 `UnifiedInput` 结构（`content` + `source` + `metadata`），每次输入固定触发一次调用（Invocation）。
-- **Agent** 拿到输入后，可以多轮调用工具（内置 demo 工具，也可接入 MCP 工具），最终输出一个 JSON 对象：`{ "units": [ { "module": "...", "payload": {...} }, ... ] }`。`units` 可以同时包含任意输出模块的组合，也可以为空。
-- **输出模块**（Output module）向 Agent 注册时声明自己接受的 JSON schema。Agent 严格按 schema 校验后再派发（fire-and-forget），模块立刻返回 `OutputResult`（成功/失败或文字信息）。
-- **闭环**：每次派发产生的 `OutputResult` 会作为系统消息随下一轮输入重新进入 Agent 的记忆，Agent 可以看到自己上一次派发的结局并作出反应。
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│  输入模块     │    │  Agent/Hub  │    │  输出模块     │
+│ (独立服务)    │───▶│  (Waycast)  │───▶│ (独立服务)    │
+└─────────────┘    │  /ws/modules │    └─────────────┘
+                   └─────────────┘
+  所有帧走同一条多路复用 WebSocket 连接（A25）
+  capability / input / output_unit / result / status_query / status_result
+```
 
-全局只有一份记忆（Global memory）：所有输入累积到同一条对话历史，由单个消费者逐条处理，没有会话隔离（文档见 [ADR-0005](docs/adr/0005-global-memory-single-thread.md)）。
+### 核心概念
+
+- **Input module**：把外部信号转成统一 `UnifiedInput`（`content` + `source` + `metadata`）的独立服务，经 WebSocket 发送 `input` 帧；每条输入恰好触发一次 Invocation。
+- **Agent**：对每条输入运行一次多轮工具调用（内置真实工具 + 可接入 MCP 工具），产出结构化 JSON：`{ "units": [ { "module": "...", "payload": {...} }, ... ] }`，`units` 可为空。
+- **Output module**：连接时声明自己接受的 JSON Schema 与语义描述；收到 `output_unit` 帧后立即返回 `result` 帧（成功/失败）。Agent 在派发前按 schema 校验（ADR-0008）。
+- **闭环**：模块返回的 `result` 帧累积进全局记忆，随下一轮输入作为消息重新进入 Agent（ADR-0002）。
+- **Global memory**：所有输入累积到同一条对话历史（固定 `thread_id` + `InMemorySaver`），单消费者逐条处理，无会话隔离（ADR-0005）。
+
+### 关键设计点
+
+- **单一的 WebSocket 通道**：一条 `/ws/modules` 连接，首帧必须是 capability advertisement；同一连接可同时作为输入、输出或两者（A25）。模块名是连接身份，重连幂等替换旧连接；断开时从 capability catalog 移除。
+- **能力注册**：capability 帧声明模块的唯一名、自然语言描述（输入）或 JSON Schema + 语义描述（输出），以及可选的 status 查询通道（A19）。这些描述自动成为 Agent 系统提示词的一部分。
+- **状态查询可选**：模块只有宣告 `status.enabled` 才获得 `status_<module>` 工具（经 capability-bridge middleware 暴露，非 MCP server）；无状态可查的模块不宣告，也不生成工具。
+- **JSON 输出优先，否则自动回退**：Pydantic schema 直接传给 `create_agent` 的 `response_format`，LangChain v1 的 `AutoStrategy` 自动探测——provider 原生支持结构化输出走 `ProviderStrategy`，否则回退 `ToolStrategy`（ADR-0003）。
+- **背压**：所有输入（无论来自哪个模块）进入同一个有界 `asyncio.Queue`，单消费者 worker 逐条处理；队列满时生产者阻塞（ADR-0006）。
+- **连接 token**：`WAYCAST_HUB_TOKEN` 共享密钥，模块在 WebSocket 握手（query 参数）时提交，校验通过才受理（A8）。token 为空时关闭鉴权。
 
 ## 快速开始
 
@@ -23,14 +43,15 @@ Waycast 把“输入”和“输出”都做成可插拔模块，统一走一套
 uv sync
 ```
 
-### 配置真实模型
+### 配置
 
-Waycast 使用 **OpenAI Chat Completions** API（经 base URL 指向任意 OpenAI 兼容端点），凭据通过环境变量或项目根目录的 `.env` 文件提供：
+复制 `.env.example` 为 `.env` 并填入真实凭据（`.env` 已被 `.gitignore` 忽略）：
 
 ```bash
 export WAYCAST_BASE_URL="https://your-provider.example.com/v1"   # 或 OPENAI_BASE_URL
 export WAYCAST_API_KEY="sk-..."                                  # 或 OPENAI_API_KEY
-export WAYCAST_MODEL="gpt-4o-mini"                               # 可选，默认 gpt-4o-mini
+export WAYCAST_MODEL="deepseek-v4-flash"                          # 可选，默认 gpt-4o-mini
+export WAYCAST_HUB_TOKEN=""                                       # 可选，模块连接 token（空则关闭鉴权）
 ```
 
 其他可选变量：
@@ -45,7 +66,7 @@ export WAYCAST_MODEL="gpt-4o-mini"                               # 可选，默�
 
 ### 自定义 Agent 系统提示词
 
-你可以直接写 **一整段纯文本** 作为 Agent 系统提示词的用户部分。默认读取项目根目录的 `waycast.prompt.txt`（可用环境变量 `WAYCAST_AGENT_CONFIG` 指定其他路径），文件内容原样读入，无需任何 TOML、转义或字段结构：
+你可以直接写 **一整段纯文本** 作为 Agent 系统提示词的用户部分。默认读取项目根目录的 `waycast.prompt.txt`（可用环境变量 `WAYCAST_AGENT_CONFIG` 指定路径），文件内容原样读入，无需 TOML、转义或字段结构：
 
 ```text
 你是一位天气预报助手。
@@ -57,13 +78,13 @@ export WAYCAST_MODEL="gpt-4o-mini"                               # 可选，默�
 2. 回复要简洁，避免啰嗦。
 ```
 
-文件内容会拼在自动生成的 **输出模块目录**（每个输出模块的 `describe` 与 JSON schema，见 `ModuleRegistry.describe_output_modules()`）**前面**，构成最终系统提示词：
+文件内容拼在自动生成的 capability catalog（每个连接模块的 `describe` 与 JSON Schema）之前，构成最终系统提示词：
 
 ```
-[你的纯文本提示词]  +  [自动生成的输出模块目录 + schema + 规则]
+[固定 base prompt] + [你的纯文本提示词] + [自动生成的模块目录 + schema + 状态工具] + [默认规则]
 ```
 
-协议规范始终保留在提示词里（与 AGENTS.md「跨模块协议以 `waycast.protocols` 为唯一权威」一致）；你不必（也不应该）自己重复输出模块协议，只写角色、场景与行为要求即可。文件缺失或为空时，系统提示词保持默认不变。
+协议规范始终保留在提示词里；你只写角色、场景与行为要求。文件缺失或为空时，系统提示词保持默认不变。
 
 ### 启动服务
 
@@ -71,130 +92,54 @@ export WAYCAST_MODEL="gpt-4o-mini"                               # 可选，默�
 uv run waycast serve
 ```
 
-启动后：
+服务提供：
 
-- `POST /input` —— 提交一条统一输入。请求体为 `{ "content": "...", "source": "http", "metadata": {...} }`（后两个可选）。入队成功立即返回 `200`；队列满时生产者阻塞，这就是背压（Backpressure）契约。
+- `WS /ws/modules` —— 模块连接端点（唯一入口，取代了旧的 HTTP `/input`）。
 - `GET /health` —— 健康检查，返回 `queue_size`。
-- `GET /results` —— 最近一次调用的完整结果（分发的 units、每个派发的 OutputResult）以及全部待反馈的 `pending_output_results`。
-
-### 一个最小演示
-
-```bash
-curl -s http://127.0.0.1:8000/input \\
-  -H 'Content-Type: application/json' \\
-  -d '{"content": "现在是几点？"}'
-```
-
-Agent 会调用可用的工具（默认只内置真实的 `get_time`），然后把 units 派发给已注册的输出模块。用 `curl -s http://127.0.0.1:8000/results` 查看 `units` 与各模块返回的 `results`；来自 `notify` 模块的结果会在下一次输入时作为系统消息重新进入 Agent。
-
-## 架构
-
-```
-输入模块 ──> UnifiedInput ──> [ 有界队列（背压）] ──> 单个消费者 worker
-                                                          |
-                                                          v
-                                               Agent（LangChain v1 create_agent）
-                                               · 多轮工具调用（函数工具 / MCP 工具）
-                                               · 结构化输出 response_format=AgentOutput
-                                                          |
-                                units: [ {module, payload}, ... ]（可为空）
-                                                          v
-                       输出模块 A ──> OutputResult A ─┐
-                       输出模块 B ──> OutputResult B ──┼──> 该结果作为消息进入下一轮
-                       输出模块 C ──> OutputResult C ─┘
-```
-
-关键设计点：
-
-- **JSON 输出优先，否则自动回退**：把 Pydantic schema 直接传给 `create_agent` 的 `response_format`，LangChain v1 的 `AutoStrategy` 会自动探测——provider 原生支持结构化输出就走 `ProviderStrategy`（JSON mode），否则回退到 `ToolStrategy`（把 schema 当工具让模型填充）。
-- **统一的派发协议**：所有跨模块边界的对象都是可 JSON 序列化的 `dict`，所以任意传输层（HTTP、队列、回调）都能承载。
-- **失败降级**：遇到未注册的输出模块、schema 校验失败或 `accept` 抛异常时，该 unit 被丢弃，但会产生一个 `error` 状态的 `OutputResult` 记入待反馈，让 Agent 下一轮知道并尝试修复。
-- **背压**：有界的 `asyncio.Queue` + 单消费者 worker。队列满时生产者阻塞，而不是拒绝或限流（[ADR-0006](docs/adr/0006-fastapi-bounded-blocking-queue.md)）。
-- **全局记忆**：固定 `thread_id` + `InMemorySaver` 检查点，所有输入累积在同一条对话历史上（[ADR-0005](docs/adr/0005-global-memory-single-thread.md)）。
+- `GET /results` —— 最近一次调用的完整结果（units、各派发的 OutputResult）、`pending_output_results`、已连接模块与队列大小。
 
 ## 编写自己的模块
 
-模块与 Agent 之间的协议定义在 [src/waycast/protocols.py](src/waycast/protocols.py)，所有类型都是运行时可见的 `Protocol`。
-
-### 输入模块
-
-实现 `InputModule` 协议，`emit` 返回 `UnifiedInput`：
+模块是独立的 WebSocket 客户端。协议由两部分组成：`waycast.wire`（帧信封）与 `waycast.protocols`（载荷模型）。参考实现见 [examples/waycast_examples/](examples/waycast_examples/)（`client.py` 提供 `connect_module` 上下文管理器，处理连接、token、capability 握手与确认）。
 
 ```python
-from waycast.protocols import InputModule, UnifiedInput
+import json
+from waycast_examples.client import connect_module
+from waycast.wire import make_frame
 
-class MyInput(InputModule):
-    @property
-    def name(self) -> str:
-        return "my_input"
+CAPABILITY = {
+    "name": "alert",
+    "kind": "output",
+    "output": {
+        "schema": {
+            "type": "object",
+            "properties": {"message": {"type": "string"}, "severity": {"type": "string"}},
+            "required": ["message"],
+            "additionalProperties": False,
+        },
+        "description": "向指定接收人发送告警（message + severity）",
+    },
+}
 
-    def emit(self, **kwargs) -> UnifiedInput:
-        return UnifiedInput(
-            content=str(kwargs["text"]),
-            source=self.name,
-            metadata={"extra": kwargs.get("extra")},
-        )
+async with connect_module(hub_url="ws://127.0.0.1:8000", token="your-hub-token", capability=CAPABILITY) as ws:
+    async for raw in ws:
+        frame = json.loads(raw)
+        if frame["type"] == "output_unit":
+            # 真实派发逻辑（HTTP、队列、回调等）
+            await ws.send(make_frame("result", "alert", {"module": "alert", "status": "ok", "detail": "sent"}).model_dump_json())
 ```
 
-内置的 [HttpInputModule](src/waycast/modules.py) 就是最小范例。注意：输入由服务调用 `emit` 后进队列，每条输入恰好触发一次调用。
+关键点：
 
-### 输出模块
+- **首帧必须是 capability**，否则连接被拒绝（`4400`）。
+- **kind**：`input` / `output` / `both`，同一连接可同时承担输入与输出（A25）。
+- **status 可选**：模块宣告 `status.enabled: true` 后，Agent 的模型会获得 `status_<module>` 工具；收到 `status_query` 帧时返回 `status_result` 帧（`request_id` 回填）。
+- **重连幂等**：同名模块重连会替换旧连接；断开即从目录移除，Agent 提示词与派发路由立即反映（A20）。
 
-实现 `OutputModule` 协议：声明 `name`、接受的 Pydantic `output_schema`、同步 `accept`（返回 `OutputResult`）和 `describe`（会注入系统提示词供 LLM 决策）：
+## 内置真实工具与测试化占位
 
-```python
-from pydantic import BaseModel, Field
-from waycast.protocols import OutputModule
-from waycast.state import OutputResult
-
-class AlertSchema(BaseModel):
-    message: str = Field(description="告警文本")
-    severity: str = Field(default="info", description="info | warning | error")
-    to: str = Field(description="接收人")
-
-class AlertOutput(OutputModule):
-    @property
-    def name(self) -> str:
-        return "alert"
-
-    @property
-    def output_schema(self):
-        return AlertSchema
-
-    def accept(self, payload: dict) -> OutputResult:
-        data = AlertSchema.model_validate(payload)   # 派发前 Agent 已校验，这里再兜底
-        # ... 真实派发逻辑（HTTP、队列、回调等）
-        return OutputResult(module=self.name, status="ok", detail=f"已发送给 {data.to}")
-
-    def describe(self) -> str:
-        return "向指定接收人发送告警（message + severity + to）。"
-```
-
-注册并装配（参见 [src/waycast/demo.py](src/waycast/demo.py)）：
-
-```python
-from waycast.agent import Agent
-from waycast.config import WaycastConfig, make_model
-from waycast.demo import build_service
-from waycast.protocols import ModuleRegistry
-
-reg = ModuleRegistry()
-reg.register_input(MyInput())
-reg.register_output(AlertOutput())
-# ... 还可以注册更多输入/输出模块
-
-config = WaycastConfig.from_env()
-agent = Agent(registry=reg, model=make_model(config))
-service = build_service(reg, agent, config)
-```
-
-注册了你的模块后，`describe_output_modules()` 生成的目录（含每个模块的 JSON schema）会自动注入系统提示词，Agent 就会在多轮工具调用后给出对应的 `units`。
-
-## 内置 demo 模块与工具
-
-- **输出模块**：`notify`（发通知，schema 为 `message` + `level`）、`memory_log`（写结构化日志，schema 为 `text` + `tags`）。
-- **输入模块**：`http`（把 `POST /input` 的请求体转成 `UnifiedInput`）。
-- **工具**：[src/waycast/tools.py](src/waycast/tools.py) 只内置真实工具 `get_time`；演示/测试用的占位工具（`echo`、`look_up_weather`、`store_blob`、`notify`、`emit_seen_url`，含 mock 天气与进程内副作用）已移到 [tests/demo_tools.py](tests/demo_tools.py)，仅用于测试，不进入生产包。想体验多轮工具闭环，显式注入：`Agent(registry=reg, model=model, tools=demo_tools.demo_tools())`。MCP 工具接入通过 `Agent(tools=[...])` 参数传入（见 [ADR-0004](docs/adr/0004-mcp-ships-in-langchain-core.mcp.md)）。
+- **工具**：[src/waycast/tools.py](src/waycast/tools.py) 只内置真实工具 `get_time`；演示/测试用的占位工具（`echo`、`look_up_weather`、`store_blob`、`notify`、`emit_seen_url`，含 mock 天气与进程内副作用）在 [tests/demo_tools.py](tests/demo_tools.py)，仅用于测试，不进入生产包（AGENTS.md）。
+- **MCP 工具接入**：通过 `Agent(tools=[...])` 参数注入（ADR-0004）。
 
 ## 测试
 
@@ -202,26 +147,34 @@ service = build_service(reg, agent, config)
 PYTHONPATH=src .venv/bin/python -m pytest tests/ -q
 ```
 
-测试不依赖网络：`tests/conftest.py` 提供一个同时实现 `_generate` 与 `_agenerate` 的假模型，覆盖注册去重、schema 注入提示词、多单元分发、空列表、未知模块/坏 schema 降级、异步调用与结果累积，以及服务的 worker 消费与队列背压。
+路由层测试（wire 帧、capability 目录、hub 帧路由、prompt 拼接）离线全绿，不触网。涉及真实模型行为的测试标记 `real_model`，默认跳过，需要网络与 `.env` 凭据时显式运行：
+
+```bash
+PYTHONPATH=src .venv/bin/python -m pytest tests/test_agent_real.py -q --run-real-model
+```
+
+真实模型测试覆盖结构化输出（units 可为空）、多轮工具调用（模型必须调用真实 `get_time`）、可选状态工具往返、输出结果进入下一轮（ADR-0002）。
 
 ## 项目结构
 
 ```
 src/waycast/
   agent.py         Agent：create_agent + 结构化输出 + 单元派发 + 结果记忆
-  blocks.py        消息构建块（把待反馈结果转成 SystemMessage）
+  bridge.py        CapabilityBridge middleware：系统提示词装配 + 状态工具 + 单元路由
+  capabilities.py  CapabilityCatalog：已连接模块的能力目录
   cli.py           waycast serve 入口
   config.py        环境变量 / .env 配置，构建 ChatOpenAI
-  demo.py          demo 装配：registry + 模块 + 模型 + Agent + Service
-  modules.py       内置输入/输出模块
-  prompt_config.py 读取纯文本用户提示词，与输出模块目录拼接
-  protocols.py     统一协议：UnifiedInput / OutputModule / InputModule / ModuleRegistry
-  registry.py      ModuleRegistry 再导出
+  hub.py           WebSocket Hub：模块连接、帧路由、状态往返
+  wire.py          Wire 协议：JSON 帧信封 + capability 校验
+  protocols.py     载荷模型：UnifiedInput / OutputUnit
   service.py       FastAPI + 有界背压队列 + 单消费者 worker
+  prompt_config.py 读取纯文本用户提示词，与模块目录拼接
   tools.py         内置真实工具（get_time）
+examples/
+  waycast_examples/ 参考模块客户端（cron_source / echo_bell / log_sink）+ connect_module
 tests/
-  demo_tools.py    演示/测试占位工具（mock 天气、通知、blob、URL）
-docs/adr/          全部架构决策（0001-0007）
+  demo_tools.py    演示/测试占位工具（不进入生产包）
+  test_*_real.py   真实模型冒烟测试（--run-real-model）
+docs/adr/          全部架构决策（0001-0008）
 GLOSSARY.md        术语表
 ```
-

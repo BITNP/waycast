@@ -1,14 +1,6 @@
-"""User-customizable Agent system prompt (plain-text) tests.
-
-Covers reading the whole plain-text file as the user part of the system
-prompt, the default-prompt fallback when no file exists, and the order:
-user prompt first, auto-generated catalog second.
-"""
-
+"""User-customizable Agent system prompt (plain-text file) tests."""
 from __future__ import annotations
 
-from waycast.agent import _build_system_prompt
-from waycast.demo import build_registry
 from waycast.prompt_config import (
     build_system_prompt_with_user,
     read_user_system_prompt,
@@ -20,7 +12,6 @@ def test_missing_file_returns_none(tmp_path):
 
 
 def test_default_path_when_unset(tmp_path, monkeypatch):
-    # No WAYCAST_AGENT_CONFIG and no ./waycast.prompt.txt in cwd -> None.
     monkeypatch.delenv("WAYCAST_AGENT_CONFIG", raising=False)
     monkeypatch.chdir(tmp_path)
     assert read_user_system_prompt() is None
@@ -38,7 +29,6 @@ def test_reads_full_plain_text_multiline(tmp_path):
     )
     got = read_user_system_prompt(p)
     assert got is not None
-    # whole file read verbatim, no field splitting
     assert "你是一位天气预报助手" in got
     assert "务必先调用天气工具再回复" in got
     assert got.count("\n") >= 4
@@ -50,24 +40,27 @@ def test_empty_file_returns_none(tmp_path):
     assert read_user_system_prompt(p) is None
 
 
-def test_missing_file_leaves_default_prompt(tmp_path):
-    reg = build_registry()
-    default = _build_system_prompt(reg)
-    unchanged = _build_system_prompt(reg, user_system_prompt=None)
-    assert default == unchanged
-    assert "notify" in default
-    assert "memory_log" in default
-    assert "You are the Waycast agent" in default
-
-
-def test_user_prompt_prepended_to_catalog(tmp_path):
+def test_catalog_and_rules_after_user_prompt():
     user = "你是一位天气预报助手。\n每天早晨推送天气与穿衣建议。\n务必先调用天气工具再回复。"
     prompt = build_system_prompt_with_user(
-        build_registry().describe_output_modules(), user
+        user,
+        base="BASE",
+        catalog="CATALOG",
+        status="STATUS",
+        rules="RULES",
     )
-    # catalog still present, after the user text
-    assert "notify" in prompt and "memory_log" in prompt
-    assert prompt.index("你是一位天气预报助手") < prompt.index("notify")
+    assert prompt.count("\n\n") == 4
+    parts = prompt.split("\n\n")
+    assert parts[0] == "BASE"
+    assert parts[1] == user
+    assert parts[2] == "CATALOG"
+    assert parts[3] == "STATUS"
+    assert parts[4] == "RULES"
+
+
+def test_empty_parts_are_dropped():
+    prompt = build_system_prompt_with_user(None, base="", catalog="", status="", rules="")
+    assert prompt == ""
 
 
 def test_env_var_path_is_used(tmp_path, monkeypatch):

@@ -40,11 +40,17 @@ class WaycastConfig:
         )
 
 
-def make_model(config: WaycastConfig):
+def make_model(config: WaycastConfig, http_async_client=None):
     """Build a ChatOpenAI model pointed at config.base_url.
 
     Uses Chat Completions (the standard OpenAI-compatible path) with the
     user-supplied base URL and API key.  Raises if credentials are missing.
+
+    ``http_async_client`` (optional) injects a pre-built httpx.AsyncClient;
+    when omitted ChatOpenAI uses langchain_openai's process-cached default
+    client (shared per base URL).  Callers that manage client lifetime
+    themselves (e.g. tests that close their client per scenario) should pass
+    their own client so closing it does not poison the shared cache.
     """
     from langchain_openai import ChatOpenAI
 
@@ -57,6 +63,7 @@ def make_model(config: WaycastConfig):
         base_url=config.base_url,
         api_key=config.api_key,
         model=config.model_name,
+        http_async_client=http_async_client,
     )
 
 

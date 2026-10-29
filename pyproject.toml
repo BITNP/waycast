@@ -33,4 +33,7 @@ build-backend = "uv_build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "real_model: runs against the real model configured in .env (network required)",
+]
 

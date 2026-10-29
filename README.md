@@ -99,14 +99,28 @@ uv run waycast serve
 - `GET /health` —— 健康检查，返回 `queue_size`。
 - `GET /results` —— 最近一次调用的完整结果（units、各派发的 OutputResult）、`pending_output_results`、已连接模块与队列大小；无输出模块时被跳过的输入记录在 `last_skipped`。
 
+### 运行参考模块
+
+启动 hub 后，在另一个终端用示例模块连接它（`--hub` 指向 hub 地址、`--token` 与 `WAYCAST_HUB_TOKEN` 一致）：
+
+```bash
+# 输入模块：每 60 秒推送一条当前 UTC 时间
+PYTHONPATH=src:examples .venv/bin/python -m waycast_examples.cron_source --hub ws://127.0.0.1:8000 --interval 60
+# 输出模块：接收 units 写日志
+PYTHONPATH=src:examples .venv/bin/python -m waycast_examples.log_sink --hub ws://127.0.0.1:8000
+# 输入+输出、带状态查询的演示模块（stdin 输入、stdout 回声）
+PYTHONPATH=src:examples .venv/bin/python -m waycast_examples.echo_bell --hub ws://127.0.0.1:8000
+```
+
+hub 端口不是 8000 时用 `--hub ws://127.0.0.1:<port>` 指定；配了 `WAYCAST_HUB_TOKEN` 时每个模块都带上同样的 `--token`。
+
 ## 编写自己的模块
 
 模块是独立的 WebSocket 客户端。协议由两部分组成：`waycast.wire`（帧信封）与 `waycast.protocols`（载荷模型）。参考实现见 [examples/waycast_examples/](examples/waycast_examples/)（`client.py` 提供 `connect_module` 上下文管理器，处理连接、token、capability 握手与确认）。
 
 ```python
-import json
 from waycast_examples.client import connect_module
-from waycast.wire import make_frame
+from waycast.wire import make_frame, parse_frame
 
 CAPABILITY = {
     "name": "alert",
@@ -124,8 +138,8 @@ CAPABILITY = {
 
 async with connect_module(hub_url="ws://127.0.0.1:8000", token="your-hub-token", capability=CAPABILITY) as ws:
     async for raw in ws:
-        frame = json.loads(raw)
-        if frame["type"] == "output_unit":
+        frame = parse_frame(raw)
+        if frame.type == "output_unit":
             # 真实派发逻辑（HTTP、队列、回调等）
             await ws.send(make_frame("result", "alert", {"module": "alert", "status": "ok", "detail": "sent"}).model_dump_json())
 ```

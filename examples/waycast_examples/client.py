@@ -13,11 +13,13 @@ handling.
 """
 from __future__ import annotations
 
-import json
 from contextlib import asynccontextmanager
 from typing import Any, AsyncIterator
 
 import websockets
+from urllib.parse import urlencode, urlparse, urlunparse
+
+from waycast.wire import make_frame, parse_frame
 
 
 @asynccontextmanager
@@ -27,11 +29,12 @@ async def connect_module(*, hub_url: str, token: str, capability: dict[str, Any]
     Yields the open websocket.  The caller is then free to send input,
     output_unit, result, status_query / status_result frames.
     """
-    uri = hub_url.rstrip("/") + "/ws/modules" + (("?token=" + token) if token else "")
+    parts = urlparse(hub_url.rstrip("/") + "/ws/modules")
+    query = urlencode({"token": token}) if token else parts.query
+    uri = urlunparse(parts._replace(query=query))
     async with websockets.connect(uri) as ws:
-        frame = {"protocol_version": 1, "type": "capability", "module": capability["name"], "payload": capability}
-        await ws.send(json.dumps(frame))
-        ack_raw = json.loads(await ws.recv())
-        if ack_raw.get("type") != "capability" or not ack_raw.get("payload", {}).get("accepted"):
-            raise RuntimeError("hub did not accept capability: " + repr(ack_raw))
+        await ws.send(make_frame("capability", capability["name"], capability).model_dump_json())
+        ack = parse_frame(await ws.recv())
+        if ack.type != "capability" or not ack.payload.get("accepted"):
+            raise RuntimeError("hub did not accept capability: " + ack.model_dump_json())
         yield ws

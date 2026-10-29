@@ -1,6 +1,6 @@
 [project]
 name = "waycast"
-version = "0.2.0"
+version = "0.1.0"
 description = "A pluggable agent service: unified input in, arbitrary combination of output-module units out, fire-and-forget delivery with immediate results feeding the next invocation."
 readme = "README.md"
 authors = [

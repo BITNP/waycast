@@ -1,55 +1,60 @@
 """Waycast: a pluggable agent service.
 
-Inputs arrive through pluggable input modules; each input triggers one Agent
-invocation; the Agent runs a multi-round LLM tool-calling loop and emits a list
-of output units targeted at registered output modules, which accept them
-fire-and-forget and return an immediate output result that feeds the next
-invocation.
+Modules run as independent services and connect to the Agent hub over a single
+multiplexed WebSocket per module (ADR-0008).  Inputs arrive as input frames;
+each input triggers one Agent invocation; the Agent runs a multi-round LLM
+tool-calling loop and emits a list of output units targeted at connected output
+modules, which accept them fire-and-forget and return an immediate output
+result that feeds the next invocation.
 """
 
 from waycast.agent import (
     Agent,
     AgentOutput,
+    BASE_SYSTEM_PROMPT,
+    DEFAULT_RULES,
     InvocationResult,
     WaycastAgentState,
     build_agent,
     run_invocation,
 )
+from waycast.bridge import CapabilityBridge
 from waycast.blocks import results_as_message
+from waycast.capabilities import CapabilityCatalog, ModuleEndpoint
 from waycast.config import WaycastConfig, make_model
-from waycast.demo import build_agent as build_demo_agent
-from waycast.demo import build_registry, build_service
-from waycast.modules import (
-    HttpInputModule,
-    MemoryLogOutputModule,
-    NotifyOutputModule,
-    default_input_modules,
-    default_output_modules,
+from waycast.hub import Hub
+from waycast.prompt_config import (
+    build_system_prompt_with_user,
+    read_user_system_prompt,
 )
-from waycast.protocols import (
-    InputModule,
-    ModuleRegistry,
-    OutputModule,
-    OutputUnit,
-    UnifiedInput,
-    WaycastError,
-)
-from waycast.service import InputEnvelope, Service
+from waycast.protocols import OutputUnit, UnifiedInput, WaycastError
+from waycast.service import Service
 from waycast.state import MemoryHop, OutputResult, OutputResultState, build_state
+from waycast.wire import (
+    PROTOCOL_VERSION,
+    Capability,
+    InputCapability,
+    OutputCapability,
+    StatusCapability,
+    WireFrame,
+    make_frame,
+    parse_frame,
+)
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
-    "Agent", "AgentOutput", "InvocationResult",
-    "WaycastAgentState",
-    "build_agent", "build_demo_agent", "run_invocation",
-    "results_as_message",
+    "Agent", "AgentOutput", "BASE_SYSTEM_PROMPT", "DEFAULT_RULES",
+    "InvocationResult", "WaycastAgentState",
+    "build_agent", "run_invocation",
+    "CapabilityBridge", "results_as_message",
+    "CapabilityCatalog", "ModuleEndpoint",
     "WaycastConfig", "make_model",
-    "build_registry", "build_service",
-    "HttpInputModule", "MemoryLogOutputModule", "NotifyOutputModule",
-    "default_input_modules", "default_output_modules",
-    "InputModule", "ModuleRegistry", "OutputModule", "OutputUnit",
-    "UnifiedInput", "WaycastError",
-    "InputEnvelope", "Service",
+    "Hub",
+    "build_system_prompt_with_user", "read_user_system_prompt",
+    "OutputUnit", "UnifiedInput", "WaycastError",
+    "Service",
     "MemoryHop", "OutputResult", "OutputResultState", "build_state",
+    "PROTOCOL_VERSION", "Capability", "InputCapability", "OutputCapability",
+    "StatusCapability", "WireFrame", "make_frame", "parse_frame",
 ]

@@ -2,10 +2,10 @@
 
 The user may supply a plain-text file (default ``waycast.prompt.txt``,
 overridable via the ``WAYCAST_AGENT_CONFIG`` environment variable) whose
-entire content becomes the *user* part of the Agent's system prompt.  The
-automatically generated output-module catalog and protocol rules are always
-appended afterwards, so the protocol specification stays authoritative and
-consistent with ADR-0002 / ADR-0007.
+entire content becomes the *user* part of the Agent system prompt.  The
+capability bridge appends the automatically generated catalog and the
+protocol rules afterwards, so the protocol specification stays authoritative
+and consistent with ADR-0002 / ADR-0007.
 
 The file is read as-is: no TOML, no escaping.  Every line you write is part
 of the prompt, so multi-paragraph instructions are natural to express.
@@ -35,16 +35,22 @@ def read_user_system_prompt(path: str | os.PathLike | None = None) -> str | None
 
 
 def build_system_prompt_with_user(
-    catalog: str,
     user_prompt: str | None = None,
+    *,
+    base: str = "",
+    catalog: str = "",
+    status: str = "",
+    rules: str = "",
 ) -> str:
-    """Build the full system prompt: user instructions (if any) + catalog."""
-    from waycast.agent import SYSTEM_PROMPT_TEMPLATE
+    """Build the full system prompt: user instructions (if any), the
+    auto-generated catalog, the status-tool list, and the default rules.
 
-    template = SYSTEM_PROMPT_TEMPLATE.format(output_module_catalog=catalog)
-    if not user_prompt:
-        return template
-    return user_prompt + "\n\n" + template
+    The order is always base first, then the user prompt, then catalog, then
+    status tools, then rules, so the fixed base stays authoritative and the
+    rules stay at the bottom.  Empty parts are dropped.
+    """
+    parts = [p for p in (base, user_prompt, catalog, status, rules) if p]
+    return "\n\n".join(parts)
 
 
 __all__ = [

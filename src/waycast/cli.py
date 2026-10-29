@@ -1,8 +1,9 @@
 """waycast command-line entry point.
 
-  waycast serve   # start the HTTP service (uvicorn)
+  waycast serve   # start the WebSocket hub service (uvicorn)
 
-Uses WAYCAST_BASE_URL / WAYCAST_API_KEY (or OPENAI_*) from the environment.
+Reads WAYCAST_BASE_URL / WAYCAST_API_KEY (or OPENAI_*) and WAYCAST_HUB_TOKEN
+from the environment.
 """
 from __future__ import annotations
 
@@ -11,21 +12,35 @@ import os
 
 import uvicorn
 
-from waycast.config import WaycastConfig
-from waycast.demo import build_agent, build_registry, build_service
+from waycast.agent import Agent
+from waycast.capabilities import CapabilityCatalog
+from waycast.config import WaycastConfig, make_model
+from waycast.prompt_config import read_user_system_prompt
+from waycast.service import Service
+from waycast.tools import default_tools
 
 
 def _build_app(config: WaycastConfig):
-    reg = build_registry()
-    agent = build_agent(reg, config)
-    service = build_service(reg, agent, config)
-    return service.app
+    catalog = CapabilityCatalog()
+    agent = Agent(
+        catalog=catalog,
+        model=make_model(config),
+        tools=default_tools(),
+        thread_id=config.thread_id,
+        user_system_prompt=read_user_system_prompt(),
+    )
+    return Service(
+        agent=agent,
+        catalog=catalog,
+        queue_size=config.queue_size,
+        hub_token=os.getenv("WAYCAST_HUB_TOKEN", ""),
+    ).app
 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="waycast")
     sub = parser.add_subparsers(dest="cmd")
-    serve = sub.add_parser("serve", help="start the HTTP service")
+    serve = sub.add_parser("serve", help="start the WebSocket hub service")
     serve.add_argument("--host", default=None)
     serve.add_argument("--port", type=int, default=None)
     args = parser.parse_args(argv)

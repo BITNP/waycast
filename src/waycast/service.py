@@ -1,46 +1,72 @@
-"""The Waycast service: FastAPI + a bounded, blocking, single-consumer queue.
+"""The Waycast service: FastAPI hub + a bounded, blocking, single-consumer queue.
 
-POST /input enqueues a unified input and returns 202 immediately.  A single
-worker consumes inputs one at a time, runs the Agent invocation, and
-dispatches output units.  When the queue is full, producers block: that
-blocking is the backpressure contract (ADR-0006).
+The Agent is a hub (ADR-0008): modules connect over WebSocket to /ws/modules,
+announce their capabilities, and exchange wire frames.  Every input - module
+"input" frames - flows into the same bounded queue and the same single-consumer
+worker, so backpressure is globally consistent (ADR-0006).  A single worker
+consumes inputs one at a time, runs the Agent invocation, and dispatches output
+units back to the owning module connections.  Module "result" frames accumulate
+into the next invocation (ADR-0002).
+
+There is no HTTP input path: WebSocket is the only input channel (the user
+removed POST /input).
 """
 from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from collections.abc import Awaitable
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi import FastAPI, WebSocket
 
 from waycast.agent import Agent
-from waycast.protocols import ModuleRegistry, UnifiedInput
+from waycast.capabilities import CapabilityCatalog
+from waycast.hub import Hub
+from waycast.protocols import UnifiedInput
+from waycast.state import OutputResult
 
 
-class InputEnvelope(BaseModel):
-    """HTTP body for POST /input: unified input fields."""
 
-    content: str
-    source: str = "http"
-    metadata: dict[str, Any] = {}
+def _run_coro_now(coro: Awaitable[Any]) -> Any:
+    """Run a coroutine to completion when no loop is running (sync invoke)."""
+    import asyncio
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    raise RuntimeError(
+        "sync dispatch inside a running loop; use ainvoke() instead of invoke()"
+    )
 
 
 class Service:
-    """Assembles the app with one Agent + one input queue."""
+    """Assembles the hub app: one Agent + one input queue + module WebSockets."""
 
     def __init__(
         self,
         agent: Agent,
-        registry: ModuleRegistry,
+        catalog: CapabilityCatalog,
         *,
         queue_size: int = 100,
+        hub_token: str = "",
     ) -> None:
         self.agent = agent
-        self.registry = registry
+        self.catalog = catalog
         self.queue: asyncio.Queue[UnifiedInput] = asyncio.Queue(maxsize=queue_size)
         self._worker_task: asyncio.Task | None = None
         self._last_results: dict[str, Any] = {}
+
+        self.hub = Hub(
+            catalog,
+            token=hub_token,
+            enqueue_input=self._enqueue_input,
+            on_result=self._on_result,
+        )
+        agent.set_dispatch(lambda m, payload: _run_coro_now(self.hub.dispatch_unit(m, payload)))
+        agent.set_adispatch(self.hub.dispatch_unit)
+        agent.set_status_query(self.hub.query_status)
 
         @asynccontextmanager
         async def lifespan(app: FastAPI):
@@ -48,9 +74,18 @@ class Service:
             yield
             if self._worker_task:
                 self._worker_task.cancel()
+            await self.hub.close()
 
         self.app = FastAPI(title="Waycast", lifespan=lifespan)
         self._add_routes()
+
+    async def _enqueue_input(self, inp: UnifiedInput) -> None:
+        await self.queue.put(inp)  # blocking when full (backpressure)
+
+    def _on_result(self, result: OutputResult) -> None:
+        """A module answered a dispatched unit; feed it to the next invocation."""
+
+        self.agent.remember_output_result(result)
 
     def _add_routes(self) -> None:
         app = self.app
@@ -59,20 +94,6 @@ class Service:
         async def health() -> dict[str, Any]:
             return {"status": "ok", "queue_size": self.queue.qsize()}
 
-        @app.post("/input")
-        async def post_input(envelope: InputEnvelope) -> dict[str, Any]:
-            """Enqueue an input; block when full (backpressure); return 200."""
-            inp = UnifiedInput(
-                content=envelope.content,
-                source=envelope.source,
-                metadata=envelope.metadata,
-            )
-            try:
-                await self.queue.put(inp)  # blocking when full
-            except asyncio.CancelledError:
-                raise HTTPException(status_code=503, detail="service shutting down")
-            return {"accepted": True, "queue_size": self.queue.qsize()}
-
         @app.get("/results")
         async def get_results() -> dict[str, Any]:
             return {
@@ -80,8 +101,13 @@ class Service:
                 "pending_output_results": [
                     r.model_dump() for r in self.agent.pending_output_results.results
                 ],
+                "connected_modules": self.catalog.names(),
                 "queue_size": self.queue.qsize(),
             }
+
+        @app.websocket("/ws/modules")
+        async def ws_modules(websocket: WebSocket) -> None:
+            await self.hub.accept(websocket)
 
     async def _run_worker(self) -> None:
         """Single consumer: one input at a time, then dispatch."""
@@ -96,4 +122,4 @@ class Service:
                 self.queue.task_done()
 
 
-__all__ = ["Service", "InputEnvelope"]
+__all__ = ["Service"]

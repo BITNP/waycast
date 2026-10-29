@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from collections.abc import Awaitable
 from typing import Any
 
 from fastapi import FastAPI, WebSocket
@@ -24,20 +23,6 @@ from waycast.capabilities import CapabilityCatalog
 from waycast.hub import Hub
 from waycast.protocols import UnifiedInput
 from waycast.state import OutputResult
-
-
-
-def _run_coro_now(coro: Awaitable[Any]) -> Any:
-    """Run a coroutine to completion when no loop is running (sync invoke)."""
-    import asyncio
-
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    raise RuntimeError(
-        "sync dispatch inside a running loop; use ainvoke() instead of invoke()"
-    )
 
 
 class Service:
@@ -63,7 +48,6 @@ class Service:
             enqueue_input=self._enqueue_input,
             on_result=self._on_result,
         )
-        agent.set_dispatch(lambda m, payload: _run_coro_now(self.hub.dispatch_unit(m, payload)))
         agent.set_adispatch(self.hub.dispatch_unit)
         agent.set_status_query(self.hub.query_status)
 

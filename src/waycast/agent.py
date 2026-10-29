@@ -119,10 +119,6 @@ class Agent:
         """Record an output result to feed the next invocation."""
         self._output_results.add(r)
 
-    def set_dispatch(self, fn: Callable[[str, dict[str, Any]], Any]) -> None:
-        """Wire the sync unit-delivery callable (sync path)."""
-        self.bridge.set_dispatch(fn)
-
     def set_adispatch(self, fn: Callable[[str, dict[str, Any]], Awaitable[Any]]) -> None:
         """Wire the async unit-delivery callable (the hub dispatches
         output_unit frames and awaits the module's result frame)."""
@@ -146,30 +142,6 @@ class Agent:
         if isinstance(structured, AgentOutput):
             return structured.units
         return AgentOutput.model_validate(structured).units
-
-    def _finish(self, structured: Any, inp: UnifiedInput) -> InvocationResult:
-        """Sync finish: dispatch units through the sync path."""
-        stored = (
-            structured.model_dump()
-            if isinstance(structured, AgentOutput)
-            else structured
-        )
-        result = InvocationResult(input=inp, structured=stored)
-        for unit in self._normalize_units(structured):
-            result.units.append(unit)
-            out = self.bridge.dispatch_unit(unit)
-            result.results.append(out)
-            # Only remember errors here; the hub's result frame is the
-            # single authoritative success path (ADR-0002) and is
-            # accumulated by the service.
-            if not out.ok:
-                self.remember_output_result(out)
-        return result
-
-    def invoke(self, inp: UnifiedInput) -> InvocationResult:
-        """Run one invocation synchronously (blocking)."""
-        state = self.langchain_agent.invoke(self._prepare(inp), config=self._config())
-        return self._finish(state.get("structured_response"), inp)
 
     async def _afinish(self, structured: Any, inp: UnifiedInput) -> InvocationResult:
         """Async finish: dispatch units through the async hub path."""
@@ -196,15 +168,6 @@ class Agent:
         return await self._afinish(state.get("structured_response"), inp)
 
 
-def build_agent(catalog: CapabilityCatalog, model: Any, **kwargs: Any) -> Agent:
-    return Agent(catalog=catalog, model=model, **kwargs)
-
-
-def run_invocation(agent: Agent, inp: UnifiedInput) -> InvocationResult:
-    """Convenience: run one invocation on an Agent."""
-    return agent.invoke(inp)
-
-
 __all__ = [
     "Agent",
     "AgentOutput",
@@ -212,6 +175,4 @@ __all__ = [
     "DEFAULT_RULES",
     "InvocationResult",
     "WaycastAgentState",
-    "build_agent",
-    "run_invocation",
 ]

@@ -43,21 +43,3 @@ class OutputResultState(BaseModel):
             lines.append(f"- {r.module}: {r.status} {r.detail}".strip())
         return "\n".join(lines)
 
-
-MemoryHop = list[OutputResult]
-"""Alias: a hop is one invocation's worth of output results."""
-
-
-def build_state(*, messages: list[Any] | None = None, **kwargs: Any) -> dict[str, Any]:
-    """Build the LangGraph agent state dict.
-
-    The state carries ``messages`` (conversation history) plus a global
-    ``output_results`` field holding cumulative OutputResultState.
-    """
-    state: dict[str, Any] = {}
-    if messages is not None:
-        state["messages"] = list(messages)
-    else:
-        state["messages"] = []
-    state["output_results"] = kwargs.get("output_results", OutputResultState())
-    return state

@@ -65,7 +65,6 @@ class CapabilityBridge(AgentMiddleware):
         self.catalog = catalog
         self.user_system_prompt = user_system_prompt
         self.default_rules = default_rules
-        self._dispatch: Callable[[str, dict[str, Any]], OutputResult] | None = None
         self._adispatch: Callable[
             [str, dict[str, Any]], Awaitable[OutputResult]
         ] | None = None
@@ -75,13 +74,6 @@ class CapabilityBridge(AgentMiddleware):
         self._status_tool_impls: dict[str, Callable[[], Awaitable[str]]] = {}
 
     # -- wiring ----------------------------------------------------------
-
-    def set_dispatch(
-        self, dispatch: Callable[[str, dict[str, Any]], OutputResult]
-    ) -> None:
-        """Wire the sync unit-delivery callable (Agent side)."""
-
-        self._dispatch = dispatch
 
     def set_adispatch(
         self, adispatch: Callable[[str, dict[str, Any]], Awaitable[OutputResult]]
@@ -166,31 +158,6 @@ class CapabilityBridge(AgentMiddleware):
         self._status_tool_impls[name] = impl
         return tool(name, description=description)(impl)
 
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage],
-    ) -> ToolMessage:
-        """Intercept execution for runtime-registered status tools.
-
-        The status tools are injected into the model request per invocation
-        (runtime tool registration) but are not part of the static tool set,
-        so the ToolNode would reject them.  When a status tool is called, we
-        run the implementation directly and short-circuit with a ToolMessage.
-        """
-        impl = self._status_tool_impls.get(request.tool_call["name"])
-        if impl is None:
-            return handler(request)
-        try:
-            content = _run_coro_sync(impl())
-        except Exception as exc:
-            content = f"status query for {request.tool_call['name']!r} failed: {exc}"
-        return ToolMessage(
-            content=content,
-            tool_call_id=request.tool_call["id"],
-            name=request.tool_call["name"],
-        )
-
     async def awrap_tool_call(
         self,
         request: ToolCallRequest,
@@ -210,65 +177,15 @@ class CapabilityBridge(AgentMiddleware):
             name=request.tool_call["name"],
         )
 
-    # -- routing output units --------------------------------------------
-
-    def dispatch_unit(self, unit: Any) -> OutputResult:
-        """Route one output unit to its module, return the immediate outcome.
-
-        The immediate outcome only records whether dispatch started cleanly
-        (unknown module, schema-invalid payload, send failure).  The module's
-        real acceptance is reported later via a result frame, which the
-        service accumulates for the next invocation (ADR-0002).
-        """
-        if self._dispatch is None:
-            return OutputResult(
-                module=unit.module,
-                status="error",
-                detail="capability bridge is not wired to a hub connection",
-            )
-        out = self._dispatch(unit.module, unit.payload)
-        if isinstance(out, Awaitable):
-            raise TypeError(
-                "dispatch callable returned an awaitable; "
-                "use ainvoke() instead of invoke()"
-            )
-        return out
-
     async def adispatch_unit(self, unit: Any) -> OutputResult:
         """Route one output unit asynchronously; return the immediate outcome."""
         if self._adispatch is not None:
             return await self._adispatch(unit.module, unit.payload)
-        if self._dispatch is not None:
-            out = self._dispatch(unit.module, unit.payload)
-            if isinstance(out, Awaitable):
-                return await out
-            return out
         return OutputResult(
             module=unit.module,
             status="error",
             detail="capability bridge is not wired to a hub connection",
         )
-
-
-def _run_coro_sync(coro: Awaitable[str]) -> str:
-    """Run a coroutine to completion from a synchronous context.
-
-    The ToolNode sync path invokes the status-tool wrapper synchronously even
-    though the implementation awaits the hub.  When no loop is running we
-    drive the coroutine with asyncio.run; when a loop IS running (the sync
-    path is driven inside one) we cannot block it, so we raise a clear error
-    suggesting the async invocation path instead.
-    """
-    import asyncio
-
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    raise RuntimeError(
-        "the status tool needs the event loop; use ainvoke() instead of "
-        "invoke() when status tools are wired"
-    )
 
 
 __all__ = ["CapabilityBridge", "DEFAULT_RULES"]

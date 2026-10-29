@@ -15,7 +15,7 @@ from waycast.agent import (
     build_agent,
     run_invocation,
 )
-from waycast.blocks import BlockError, ExpressionBlock, TextBlock
+from waycast.blocks import results_as_message
 from waycast.config import WaycastConfig, make_model
 from waycast.demo import build_agent as build_demo_agent
 from waycast.demo import build_registry, build_service
@@ -36,7 +36,6 @@ from waycast.protocols import (
 )
 from waycast.service import InputEnvelope, Service
 from waycast.state import MemoryHop, OutputResult, OutputResultState, build_state
-from waycast.tools import default_tools
 
 __version__ = "0.1.0"
 
@@ -44,7 +43,7 @@ __all__ = [
     "Agent", "AgentOutput", "InvocationResult",
     "WaycastAgentState",
     "build_agent", "build_demo_agent", "run_invocation",
-    "BlockError", "ExpressionBlock", "TextBlock",
+    "results_as_message",
     "WaycastConfig", "make_model",
     "build_registry", "build_service",
     "HttpInputModule", "MemoryLogOutputModule", "NotifyOutputModule",
@@ -53,5 +52,4 @@ __all__ = [
     "UnifiedInput", "WaycastError",
     "InputEnvelope", "Service",
     "MemoryHop", "OutputResult", "OutputResultState", "build_state",
-    "default_tools",
 ]

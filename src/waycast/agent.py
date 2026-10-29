@@ -18,7 +18,6 @@ from pydantic import BaseModel, Field
 from waycast.blocks import results_as_message
 from waycast.protocols import ModuleRegistry, OutputUnit, UnifiedInput
 from waycast.state import OutputResult, OutputResultState
-from waycast.tools import default_tools
 from typing_extensions import NotRequired, Required, TypedDict
 
 
@@ -101,7 +100,7 @@ class Agent:
     ) -> None:
         self.registry = registry
         self.model = model
-        self.tools = tools if tools is not None else default_tools()
+        self.tools = tools if tools is not None else []
         self.checkpointer = checkpointer or _make_checkpointer()
         self.thread_id = thread_id
         self._output_results = OutputResultState()

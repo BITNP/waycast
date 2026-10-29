@@ -82,10 +82,10 @@ uv run waycast serve
 ```bash
 curl -s http://127.0.0.1:8000/input \\
   -H 'Content-Type: application/json' \\
-  -d '{"content": "上海的天气怎么样？顺便通知我一下秋裤指数。"}'
+  -d '{"content": "现在是几点？"}'
 ```
 
-Agent 会多轮调用工具（查天气、记日志、发通知），然后把 units 派发给已注册的输出模块。用 `curl -s http://127.0.0.1:8000/results` 查看 `units` 与各模块返回的 `results`；来自 `notify` 模块的结果会在下一次输入时作为系统消息重新进入 Agent。
+Agent 会调用可用的工具（默认只内置真实的 `get_time`），然后把 units 派发给已注册的输出模块。用 `curl -s http://127.0.0.1:8000/results` 查看 `units` 与各模块返回的 `results`；来自 `notify` 模块的结果会在下一次输入时作为系统消息重新进入 Agent。
 
 ## 架构
 
@@ -194,7 +194,7 @@ service = build_service(reg, agent, config)
 
 - **输出模块**：`notify`（发通知，schema 为 `message` + `level`）、`memory_log`（写结构化日志，schema 为 `text` + `tags`）。
 - **输入模块**：`http`（把 `POST /input` 的请求体转成 `UnifiedInput`）。
-- **工具**：[src/waycast/tools.py](src/waycast/tools.py) 内置 `get_time`、`echo`、`look_up_weather`、`store_blob`、`notify`、`emit_seen_url`，用于演示多轮工具调用；MCP 工具接入通过 `Agent(tools=[...])` 参数传入（见 [ADR-0004](docs/adr/0004-mcp-ships-in-langchain-core.mcp.md)）。
+- **工具**：[src/waycast/tools.py](src/waycast/tools.py) 只内置真实工具 `get_time`；演示/测试用的占位工具（`echo`、`look_up_weather`、`store_blob`、`notify`、`emit_seen_url`，含 mock 天气与进程内副作用）已移到 [tests/demo_tools.py](tests/demo_tools.py)，仅用于测试，不进入生产包。想体验多轮工具闭环，显式注入：`Agent(registry=reg, model=model, tools=demo_tools.demo_tools())`。MCP 工具接入通过 `Agent(tools=[...])` 参数传入（见 [ADR-0004](docs/adr/0004-mcp-ships-in-langchain-core.mcp.md)）。
 
 ## 测试
 
@@ -218,8 +218,9 @@ src/waycast/
   protocols.py     统一协议：UnifiedInput / OutputModule / InputModule / ModuleRegistry
   registry.py      ModuleRegistry 再导出
   service.py       FastAPI + 有界背压队列 + 单消费者 worker
-  state.py         OutputResult / OutputResultState / 全局记忆状态
-  tools.py         内置 demo 工具
+  tools.py         内置真实工具（get_time）
+tests/
+  demo_tools.py    演示/测试占位工具（mock 天气、通知、blob、URL）
 docs/adr/          全部架构决策（0001-0007）
 GLOSSARY.md        术语表
 ```

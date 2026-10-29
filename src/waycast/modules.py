@@ -16,9 +16,7 @@ from waycast.state import OutputResult
 
 # -- demo-side stores ----------------------------------------------------
 
-_blob_store: dict[str, str] = {}
-_notifications: list[str] = []
-_seen_urls: list[str] = []
+_notifications: list[dict[str, Any]] = []
 _echo_log: list[dict[str, Any]] = []
 
 
@@ -114,7 +112,5 @@ __all__ = [
     "HttpInputModule",
     "default_output_modules",
     "default_input_modules",
-    "_blob_store",
     "_notifications",
-    "_seen_urls",
 ]

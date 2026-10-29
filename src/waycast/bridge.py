@@ -79,7 +79,7 @@ class CapabilityBridge(AgentMiddleware):
     def set_dispatch(
         self, dispatch: Callable[[str, dict[str, Any]], OutputResult]
     ) -> None:
-        """Wire the sync unit-delivery callable (Agent side, tests use a fake)."""
+        """Wire the sync unit-delivery callable (Agent side)."""
 
         self._dispatch = dispatch
 

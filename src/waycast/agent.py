@@ -120,7 +120,7 @@ class Agent:
         self._output_results.add(r)
 
     def set_dispatch(self, fn: Callable[[str, dict[str, Any]], Any]) -> None:
-        """Wire the sync unit-delivery callable (tests use a sync fake)."""
+        """Wire the sync unit-delivery callable (sync path)."""
         self.bridge.set_dispatch(fn)
 
     def set_adispatch(self, fn: Callable[[str, dict[str, Any]], Awaitable[Any]]) -> None:

@@ -14,6 +14,7 @@ from waycast.modules import (
     NotifyOutputModule,
 )
 from waycast.protocols import ModuleRegistry
+from waycast.prompt_config import AgentSystemPromptConfig
 from waycast.service import Service
 from waycast.tools import default_tools
 
@@ -28,6 +29,8 @@ def build_registry() -> ModuleRegistry:
 
 def build_agent(reg: ModuleRegistry, config: WaycastConfig, **kwargs) -> Agent:
     model = make_model(config)
+    if "system_prompt_config" not in kwargs:
+        kwargs["system_prompt_config"] = AgentSystemPromptConfig.from_toml_path()
     return Agent(
         registry=reg,
         model=model,

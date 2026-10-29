@@ -72,9 +72,17 @@ Rules:
 """
 
 
-def _build_system_prompt(registry: ModuleRegistry) -> str:
+def _build_system_prompt(
+    registry: ModuleRegistry,
+    system_prompt_config: "AgentSystemPromptConfig | None" = None,
+) -> str:
+    """Build the system prompt: auto-generated catalog plus optional user
+    customization (role / scenario / custom instructions).
+    """
+    from waycast.prompt_config import build_system_prompt_with_config
+
     catalog = registry.describe_output_modules()
-    return SYSTEM_PROMPT_TEMPLATE.format(output_module_catalog=catalog)
+    return build_system_prompt_with_config(catalog, system_prompt_config)
 
 
 class Agent:
@@ -89,6 +97,7 @@ class Agent:
         checkpointer: Any | None = None,
         thread_id: str = "waycast-global",
         system_prompt: str | None = None,
+        system_prompt_config: Any | None = None,
     ) -> None:
         self.registry = registry
         self.model = model
@@ -96,7 +105,9 @@ class Agent:
         self.checkpointer = checkpointer or _make_checkpointer()
         self.thread_id = thread_id
         self._output_results = OutputResultState()
-        prompt = system_prompt or _build_system_prompt(registry)
+        prompt = system_prompt or _build_system_prompt(
+            registry, system_prompt_config=system_prompt_config
+        )
         self.langchain_agent = create_agent(
             model=model,
             tools=self.tools,

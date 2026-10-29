@@ -47,9 +47,10 @@ alongside the user-customized text. The Agent keeps schema validation before
 dispatch (existing behavior); schema travels as JSON Schema over the wire, not
 as pydantic objects.
 
-**Inputs**: all inputs, from the HTTP \`POST /input\` entry or from module
-frames over WebSocket, flow into the same bounded queue and the same
+**Inputs**: all inputs arrive as module `input` frames over WebSocket
+connections to the hub, flow into the same bounded queue and the same
 single-consumer worker; backpressure is globally consistent (ADR-0006).
+WebSocket is the only input channel; there is no HTTP input path.
 
 **Output results**: a module returns a \`result\` frame over the same
 connection after accepting an output unit; the Agent accumulates it into
@@ -78,8 +79,8 @@ WebSocket handshake or in the first capability frame; mismatches are closed.
 
 ## Consequences
 
-- \`src/\` contains only the core: protocol, Agent, service, the registry as
-  hub, and the HTTP \`/input\` entry.
+- \`src/\` contains only the core: protocol, Agent, service, the hub, and the
+  WebSocket module endpoint. WebSocket is the only input channel.
 - No mocks live in production code.
 - The in-process \`ModuleRegistry\` evolves into a registry of connected
   endpoints with capability discovery.

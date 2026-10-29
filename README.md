@@ -94,7 +94,7 @@ uv run waycast serve
 
 服务提供：
 
-- `WS /ws/modules` —— 模块连接端点（唯一入口，取代了旧的 HTTP `/input`）。
+- `WS /ws/modules` —— 模块连接唯一入口（所有输入经模块 `input` 帧进入）。
 - `GET /health` —— 健康检查，返回 `queue_size`。
 - `GET /results` —— 最近一次调用的完整结果（units、各派发的 OutputResult）、`pending_output_results`、已连接模块与队列大小。
 

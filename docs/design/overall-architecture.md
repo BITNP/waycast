@@ -5,7 +5,7 @@
 
 ## 目标
 
-- `src/` 只保留本体：协议、Agent、Service(hub)、HTTP `/input`、WebSocket 模块端点。
+- `src/` 只保留本体：协议、Agent、Service(hub)、WebSocket 模块端点。不存在 HTTP 输入路径。
 - 生产代码中不存在任何 mock / 占位 / 内置示例模块。
 - 输入/输出模块是独立微服务，通过网络与 Agent 通信，可任意接入、灵活替换。
 
@@ -19,7 +19,6 @@
                     │  · capability catalog       │
                     │  · create_agent 本体        │
                     │  · bounded queue / worker   │
-                    │  · HTTP POST /input         │
                     └───▲──────────────▲──────────┘
               WS 连接    │ (multiplexed │  WS 连接
               (ability)  │  + 状态查询)  │ (ability)
@@ -52,7 +51,7 @@
 7. 模块名称作连接身份；重连幂等（同名新连接替换旧连接）。
 8. **连接 token 校验**（`WAYCAST_HUB_TOKEN`，握手或 capability 帧携带，不匹配即关连接）。
 9. capability 帧携带 JSON Schema + 语义描述；Agent 侧保留 schema 校验。
-10. 所有来源的输入（HTTP / WS）汇入同一有界队列 + 单消费者 worker，背压全局一致。
+10. 所有输入（模块 `input` 帧经 WS 汇入）进同一有界队列 + 单消费者 worker，背压全局一致；无 HTTP 输入。
 11. OutputResult 经同一连接回传，Agent 累积进 `OutputResultState`（ADR-0002）。
 12. 示例模块放 `examples/`，独立可运行，兼作测试与开发者参考。
 
@@ -72,7 +71,7 @@
 21. 断开即从 catalog 摘除，掉线事实进入下一轮提示词；重连重新加入。
 22. Agent 按 JSON Schema 校验，失败不派发（转 error result 帧）。
 23. `WAYCAST_HUB_TOKEN` 共享密钥，握手或 capability 帧携带。
-24. `examples/input_module/` 与 `examples/output_module/` 两个独立可运行参考模块。
+24. `examples/waycast_examples/` 提供独立可运行参考模块（cron_source 输入、log_sink 输出、echo_bell 输入+输出）。
 
 ### R5：收尾
 

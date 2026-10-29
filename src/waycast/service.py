@@ -8,8 +8,7 @@ consumes inputs one at a time, runs the Agent invocation, and dispatches output
 units back to the owning module connections.  Module "result" frames accumulate
 into the next invocation (ADR-0002).
 
-There is no HTTP input path: WebSocket is the only input channel (the user
-removed POST /input).
+WebSocket is the only input channel.
 """
 from __future__ import annotations
 

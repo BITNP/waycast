@@ -7,9 +7,8 @@ owns the module connections and keeps the capability catalog in sync:
 - The first frame must be a capability advertisement; the module name is the
   connection identity (reconnects replace the old connection idempotently).
 - ``input`` frames flow into the same bounded queue that the service owns, so
-  backpressure is globally consistent (ADR-0006).  There is no HTTP input
-  path any more: WebSocket is the only input channel (the user removed
-  ``POST /input``).
+  backpressure is globally consistent (ADR-0006).  WebSocket is the only
+  input channel.
 - ``output_unit`` frames are sent by the hub when the Agent dispatches a unit;
   the module answers with a ``result`` frame which the worker accumulates
   (ADR-0002).

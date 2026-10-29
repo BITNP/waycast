@@ -6,7 +6,7 @@ Waycast 是一个长期运行的 Agent 服务：输入模块产生统一输入�
 
 ## 原则
 
-**文档优先。** 行为与决策以仓库文档和最新官方文档为准，不凭记忆或过时经验猜测。动手前先使用docs-mcp-server读相关文档；代码与文档冲突时，先查证哪一方过时，不凭印象站队。
+**文档优先。** 行为与决策以仓库文档和第三方依赖的官方文档为准，不凭记忆或过时经验猜测。动手前先读仓库文档（README、GLOSSARY、ADR）；涉及第三方依赖（LangChain、LangGraph、MCP 等）的版本与用法时，先使用 docs-mcp-server 在线读取其官方文档，引用时给出证据；代码与文档冲突时，先查证哪一方过时，不凭印象站队。
 
 **同步文档。** 写代码的同时写注释/文档，不留到以后补。代码改动牵动的 README、GLOSSARY、ADR、输出模块的 `describe` 与 schema 描述等文档，随改动同步更新，保持单一事实源一致。
 
@@ -20,22 +20,13 @@ Waycast 是一个长期运行的 Agent 服务：输入模块产生统一输入�
 
 **全真测试，禁止 mock。** 本仓库的 Agent 行为一律用真实模型验证，绝不引入假模型（FakeModel / FakeChat 之类）。假模型无法真正生成有意义的响应，还会制造真实模型不会出现的伪影（例如 `ainvoke` 下假模型的异步挂起，曾因此浪费多轮排查，而真实模型冒烟一路全绿）。src 代码库不存在任何 mock 或占位：test-only 的占位工具一律放 `tests/`。
 
-**验证。** 依赖由 uv 管理在 `.venv`。单元层（wire 协议、capability 目录、hub 帧路由、prompt 拼接、CLI 装配）可用本地假模块连接离线测试；涉及 Agent 模型行为（结构化输出、多轮工具调用、输出单元派发、结果进入下一轮）必须跑真实模型，测试用真实冒烟覆盖。跑 `PYTHONPATH=src .venv/bin/python -m pytest tests/ -q`，路由层测试必须全绿；真实冒烟用 `.env` 里已配置的 credentials（`WAYCAST_BASE_URL` / `WAYCAST_API_KEY`）执行，网络或 localhost 命令超出沙箱时显式说明理由申请审批，不绕过。
+**网络审批。** 所有网络访问都必须先申请审批（require_escalated 并附理由），包括对本机回环（localhost / 127.0.0.1）的连接；沙箱默认无网络权限，不绕过审批另寻联网途径。
 
-**先查自己。** 行为不符合预期（异步挂起、结果丢失、结构化输出不对）时，先查本仓库代码与测试，以代码和运行结果为事实依据；确认是自己的问题再谈外部原因。外部依赖（LangChain、LangGraph、MCP）的版本与用法按最新发布在线核对，引用时给出证据。
+**验证。** 依赖由 uv 管理在 `.venv`。单元层（wire 协议、capability 目录、hub 帧路由、prompt 拼接、CLI 装配）可用本地假模块连接离线测试；涉及 Agent 模型行为（结构化输出、多轮工具调用、输出单元派发、结果进入下一轮）必须跑真实模型，测试用真实冒烟覆盖。跑 `PYTHONPATH=src .venv/bin/python -m pytest tests/ -q`，路由层测试必须全绿；真实冒烟用 `.env` 里已配置的 credentials（`WAYCAST_BASE_URL` / `WAYCAST_API_KEY`）执行。
+
+**先查自己。** 行为不符合预期（异步挂起、结果丢失、结构化输出不对）时，先查本仓库代码与测试，以代码和运行结果为事实依据；确认是自己的问题再谈外部原因。
 
 **不确定时询问。** 需求、范围或做法不确定时，不要自作主张，停下询问用户；在得到答复前，不推进依赖该决定的改动。
-
-## 多层级转义原则（Codex exec / shell / patch）
-
-1. JS 源码层：定界符不得与内容自撞。含 ' 不用单引号，含 ` 不用反引号。
-2. String.raw 只防反斜杠被吃，不防反引号定界符冲突。
-3. exec_command.cmd 是脚本，不是 argv。不要给 | && ; > < 加引号。
-4. 不要在 cmd 里嵌套 bash -c '...'，用 heredoc 喂 bash -s 或临时脚本。
-5. heredoc 定界符只要内容含 $ ` \ 就加单引号：<<'EOF'。
-6. PowerShell：单引号字面量，双引号展开，转义字符是反引号 ` 而非 \。
-7. patch 载荷不经过 shell 引号解析，不要在 *** Begin Patch 内手动 shell-quote。
-8. apply_patch heredoc 定界符必须精确，*** Begin Patch 必须行首精确开始。
 
 ## 工作流
 

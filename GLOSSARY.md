@@ -108,11 +108,11 @@ The Beijing Institute of Technology student association that designed Raspberry 
 _Avoid_: 网络开拓者协会 (without school affiliation)
 
 **Aggregate output module (聚合输出模块)**:
-The single Waycast module that combines the Godot frontend (Live2D avatar, subtitle, emotion, motion) with TTS synthesis and playback, plus PPT display/flip. capability.kind = "both"; it receives output units and sends frontend interactions back as input frames. See ADR-0010.
+The single Waycast module that combines the Godot frontend (Live2D avatar, subtitle, emotion, motion) with TTS synthesis and playback, plus PPT display/flip. capability.kind = "both"; it receives output units and its only input frame back to the hub is queue_finished — the frontend is a pure display surface with no user-operable elements. See ADR-0010 and raspberrygirl-presenter ADR-0005.
 _Avoid_: separate TTS module, separate frontend module, PPT module
 
 **Frontend interaction (前端交互)**:
-An event produced by the user in the Godot frontend (click, request) that the aggregate output module sends back to the hub as an input frame, triggering a new Invocation.
+An event produced by the user in the Godot frontend (click, request) that the aggregate output module sends back to the hub as an input frame, triggering a new Invocation. Obsolete for the current aggregate output module: it is display-only and emits no such frames (raspberrygirl-presenter ADR-0005); do not use this term for new designs.
 _Avoid_: UI event, command
 
 **Final input (最终输入)**:

@@ -19,7 +19,7 @@ waycast 已具备的契约（ADR-0001 至 ADR-0008）——Agent-as-hub、统一
 - **模块化适配**：所有输入源作为 waycast 输入模块（发送 input 帧）；所有表现输出作为 waycast 输出或双向模块（接收 output_unit 帧并回 result 帧）。模块可独立部署、独立仓库。
 - **一切产品语义下沉模块或交给 Agent**：话权、打断、Partial/最终文本等交互语义不再由核心独立实现，而是由核心 Agent 依据输入内容自行决定，或由输入/输出模块在自身侧处理。
 - **核心功能可以增强，但契约保持固定**：waycast 现有功能与对外契约（wire 协议、模块帧、背压、记忆、工具）保持固定，不等于冻结功能。对智能体有意义但**不属于输入/输出模块能力**的功能（例如知识检索 RAG、记忆策略、提示词装配、Agent 角色行为）可以直接在 waycast 核心内实现/配置，作为核心增强；这类增强遵守 ADR-0002 的闭环（输出结果进入下一轮）等既有契约。
-- **AGENTS.md / GLOSSARY.md / ADR 以 waycast 仓库为准**：领域术语、架构决策与工作规则的唯一维护位置在 waycast 仓库；工作区根目录的共享资料（AGENTS.md / CONTEXT.md）降级为指向 waycast 的指针，architecture.md 删除。
+- **核心语义以 waycast 为准，模块文档归模块**：waycast 是核心语义（Agent、Invocation、全局记忆、wire 契约）与跨模块契约的权威；各业务模块是独立微服务项目，其 AGENTS.md、README、docs/adr 与模块专属术语在各自仓库维护（例如 raspberrygirl-voice-input 见其 docs/adr/0001-module-autonomy.md）。工作区根目录的共享资料（AGENTS.md / CONTEXT.md）降级为指向各仓库的指针，architecture.md 删除。（本条款修订方式系用户指示的"直接修改过时决策"，替代原有的"唯一维护位置在 waycast 仓库"。）
 
 ## Consequences
 

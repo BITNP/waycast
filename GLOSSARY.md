@@ -91,4 +91,38 @@ _Avoid_: password, api key, auth header
 
 **Status query**:
 A request on a module connection asking the module to report its current state; the semantics of the reported state are defined by the module itself. Exposed to the Agent's model as a status tool via the capability-bridge middleware (not as an MCP server).
-_Avoid_: healthcheck, ping, mcp query
++
+
+---
+
+## Raspberry Girl context
+
+Raspberry Girl (树莓娘) is a product built on Waycast: every input arrives as a Waycast input module, every expression is an output unit to a Waycast output module, and the Agent decides all turn-taking. Terms below are the shared vocabulary for that product layer; deprecated legacy terms are marked.
+
+**Raspberry Girl (树莓娘)**:
+The product: a front-facing multimodal agent that interacts through voice, IM, danmaku, and a Live2D avatar. Built on Waycast as its core.
+_Avoid_: 看板娘, 树莓女孩, 树莓少女
+
+**网协 (BIT Network Pioneers Association)**:
+The Beijing Institute of Technology student association that designed Raspberry Girl and owns her as its official mascot; "网协" is the only sanctioned short form.
+_Avoid_: 网络开拓者协会 (without school affiliation)
+
+**Aggregate output module (聚合输出模块)**:
+The single Waycast module that combines the Godot frontend (Live2D avatar, subtitle, emotion, motion) with TTS synthesis and playback, plus PPT display/flip. capability.kind = "both"; it receives output units and sends frontend interactions back as input frames. See ADR-0010.
+_Avoid_: separate TTS module, separate frontend module, PPT module
+
+**Frontend interaction (前端交互)**:
+An event produced by the user in the Godot frontend (click, request) that the aggregate output module sends back to the hub as an input frame, triggering a new Invocation.
+_Avoid_: UI event, command
+
+**Final input (最终输入)**:
+Every input frame that reaches the hub triggers exactly one Invocation. There is no partial/final distinction; input-side modules decide when to send, and do not mark entry as partial. See ADR-0011.
+_Avoid_: partial transcript, final transcript, barge-in candidate
+
+**Turn-taking decision (话权决定)**:
+The Agent's own reasoning about whether to interrupt current expression and how to continue, encoded as output units to the aggregate output module. No dedicated turn controller exists. See ADR-0011.
+_Avoid_: floor controller, turn epoch, clear-stop, new-reply-replace
+
+**Core enhancement (核心增强)**:
+A capability that helps the Agent reason but is not an input/output module ability (e.g. RAG retrieval, prompt assembly, memory strategy) and is implemented inside Waycast core without changing the external contract. See ADR-0012.
+_Avoid_: module, plugin, adapter

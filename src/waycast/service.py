@@ -81,6 +81,8 @@ class Service:
         async def get_results() -> dict[str, Any]:
             return {
                 "last_result": self._last_results.get("last_result"),
+                "last_error": self._last_results.get("last_error"),
+                "last_skipped": self._last_results.get("last_skipped"),
                 "pending_output_results": [
                     r.model_dump() for r in self.agent.pending_output_results.results
                 ],

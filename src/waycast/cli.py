@@ -22,7 +22,17 @@ from waycast.tools import default_tools
 
 # 第三方噪音源（LLM SDK、HTTP、WS、事件循环）默认钉在 WARNING，
 # waycast 自己的 DEBUG 日志不受影响；WAYCAST_DEPS_LOG_LEVEL 可单独放开。
-_THIRD_PARTY_LOGGERS = ("httpx", "httpcore", "websockets", "openai", "asyncio", "urllib3")
+# httpx2/httpcore2 是 openai SDK 内置 vendored 客户端的日志器名。
+_THIRD_PARTY_LOGGERS = (
+    "httpx",
+    "httpx2",
+    "httpcore",
+    "httpcore2",
+    "websockets",
+    "openai",
+    "asyncio",
+    "urllib3",
+)
 
 
 def _configure_logging() -> str:

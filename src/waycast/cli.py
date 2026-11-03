@@ -8,6 +8,7 @@ from the environment.
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 
 import uvicorn
@@ -18,6 +19,22 @@ from waycast.config import WaycastConfig, make_model
 from waycast.prompt_config import read_user_system_prompt
 from waycast.service import Service
 from waycast.tools import default_tools
+
+# 第三方噪音源（LLM SDK、HTTP、WS、事件循环）默认钉在 WARNING，
+# waycast 自己的 DEBUG 日志不受影响；WAYCAST_DEPS_LOG_LEVEL 可单独放开。
+_THIRD_PARTY_LOGGERS = ("httpx", "httpcore", "websockets", "openai", "asyncio", "urllib3")
+
+
+def _configure_logging() -> str:
+    """Configure first-party logging (WAYCAST_LOG_LEVEL, default INFO) and the
+    dependency level (WAYCAST_DEPS_LOG_LEVEL, default WARNING).  Returns the
+    dependency level so the caller can decide whether uvicorn keeps access logs."""
+    level = os.getenv("WAYCAST_LOG_LEVEL", "INFO").strip().upper() or "INFO"
+    deps = os.getenv("WAYCAST_DEPS_LOG_LEVEL", "WARNING").strip().upper() or "WARNING"
+    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    for name in _THIRD_PARTY_LOGGERS:
+        logging.getLogger(name).setLevel(deps)
+    return deps
 
 
 def _build_app(config: WaycastConfig):
@@ -51,8 +68,15 @@ def main(argv: list[str] | None = None) -> None:
             config.host = args.host
         if args.port:
             config.port = args.port
+        deps_level = _configure_logging()
         app = _build_app(config)
-        uvicorn.run(app, host=config.host, port=config.port)
+        # 访问日志（每请求一行）属依赖级噪音：默认关闭，放开依赖级别时才出现。
+        uvicorn.run(
+            app,
+            host=config.host,
+            port=config.port,
+            access_log=deps_level in ("INFO", "DEBUG"),
+        )
     else:
         parser.print_help()
 

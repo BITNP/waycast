@@ -169,6 +169,12 @@ class Hub:
             source=payload.get("source", conn.capability.name),
             metadata=dict(payload.get("metadata", {}) or {}),
         )
+        log.debug(
+            "input frame from %s -> queue (content=%r, metadata=%s)",
+            conn.capability.name,
+            inp.content[:120],
+            inp.metadata,
+        )
         if self._enqueue_input is not None:
             await self._enqueue_input(inp)
 
@@ -178,6 +184,12 @@ class Hub:
                 f"module {conn.capability.name!r} is not an output module"
             )
         result = OutputResult.model_validate(frame.payload)
+        log.debug(
+            "result frame from %s: status=%s detail=%s",
+            conn.capability.name,
+            result.status,
+            result.detail,
+        )
         if self._on_result is not None:
             self._on_result(result)
 
@@ -236,11 +248,13 @@ class Hub:
                 make_frame("output_unit", module, payload).model_dump_json()
             )
         except Exception as exc:
+            log.warning("unit dispatch to %s failed: %s", module, exc)
             return OutputResult(
                 module=module,
                 status="error",
                 detail=f"dispatch failed: {exc}",
             )
+        log.debug("unit dispatched to %s: %s", module, json.dumps(payload, ensure_ascii=False))
         return OutputResult(module=module, status="ok", detail="dispatched")
 
     async def query_status(self, module: str) -> dict[str, Any] | None:

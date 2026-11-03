@@ -25,6 +25,7 @@ remain a secondary tool-calling track.
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -40,6 +41,8 @@ from langchain_core.tools import tool
 from waycast.capabilities import CapabilityCatalog, ModuleEndpoint
 from waycast.prompt_config import build_system_prompt_with_user
 from waycast.state import OutputResult
+
+LOGGER = logging.getLogger(__name__)
 
 
 DEFAULT_RULES = """Rules:
@@ -131,7 +134,47 @@ class CapabilityBridge(AgentMiddleware):
             tools=[*request.tools, *self._status_tools()],
             system_message=SystemMessage(content=self._prompt_for(request)),
         )
-        return await handler(updated)
+        self._log_request(updated)
+        response = await handler(updated)
+        self._log_response(response)
+        return response
+
+    # -- debugging logs ----------------------------------------------------
+
+    @staticmethod
+    def _log_request(request: ModelRequest) -> None:
+        """Log what is sent to the model (system prompt is assembled per-call;
+        keep the request log to the conversation, not the static prompt)."""
+        system_chars = (
+            len(request.system_message.content)
+            if request.system_message is not None
+            else 0
+        )
+        LOGGER.debug(
+            "llm request: model=%s messages=%d system_chars=%d tools=%s",
+            getattr(request.model, "model_name", "?"),
+            len(request.messages),
+            system_chars,
+            [getattr(t, "name", str(t)) for t in request.tools],
+        )
+        for message in request.messages:
+            LOGGER.debug("llm request message %s: %r", message.type, message.content)
+
+    @staticmethod
+    def _log_response(response: ModelResponse) -> None:
+        for result in response.result:
+            tool_calls = getattr(result, "tool_calls", None)
+            if tool_calls:
+                LOGGER.debug(
+                    "llm response tool_calls: %s",
+                    [(tc.get("name"), tc.get("args")) for tc in tool_calls],
+                )
+            LOGGER.debug("llm response %s: %r", result.type, result.content)
+        if response.structured_response is not None:
+            LOGGER.debug(
+                "llm response structured: %s",
+                json.dumps(response.structured_response, ensure_ascii=False, default=str),
+            )
 
     # -- runtime status tools (A15/A19) ----------------------------------
 

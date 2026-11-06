@@ -63,6 +63,7 @@ export WAYCAST_HUB_TOKEN=""                                       # 可选，模
 | `WAYCAST_HOST` | `0.0.0.0` | 监听地址 |
 | `WAYCAST_PORT` | `8000` | 监听端口 |
 | `WAYCAST_THREAD_ID` | `waycast-global` | 全局记忆的 thread_id |
+| `WAYCAST_LLM_TIMEOUT_SECONDS` | `180` | 单次模型请求超时（含流式块间等待）；超时按 invocation 失败记录，worker 继续 |
 | `WAYCAST_AGENT_CONFIG` | `waycast.prompt.txt` | 用户系统提示词文件路径（纯文本） |
 | `WAYCAST_LOG_LEVEL` | `INFO` | 本服务日志级别（`DEBUG` 输出输入帧、LLM 请求/响应、单元派发与 result 帧等调试信息） |
 | `WAYCAST_DEPS_LOG_LEVEL` | `WARNING` | 第三方依赖日志级别（httpx/openai/websockets 等；uvicorn 访问日志仅在放开到 `INFO`/`DEBUG` 时才输出） |

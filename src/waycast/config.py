@@ -24,7 +24,6 @@ class WaycastConfig:
     host: str = "0.0.0.0"
     port: int = 8000
     thread_id: str = "waycast-global"
-    llm_timeout_seconds: float = 180.0
 
     @classmethod
     def from_env(cls):
@@ -38,7 +37,6 @@ class WaycastConfig:
             host=os.getenv("WAYCAST_HOST", "0.0.0.0"),
             port=int(os.getenv("WAYCAST_PORT", "8000")),
             thread_id=os.getenv("WAYCAST_THREAD_ID", "waycast-global"),
-            llm_timeout_seconds=float(os.getenv("WAYCAST_LLM_TIMEOUT_SECONDS", "180")),
         )
 
 
@@ -66,10 +64,6 @@ def make_model(config: WaycastConfig, http_async_client=None):
         api_key=config.api_key,
         model=config.model_name,
         http_async_client=http_async_client,
-        # 网关断流时 OpenAI SDK 默认 600s 才超时，单消费者 worker 会被
-        # 拖死近 10 分钟；显式收紧到配置值（实测断流请求永不返回，超时后
-        # worker 按"never kill the worker"路径存活继续消费）。
-        timeout=config.llm_timeout_seconds,
     )
 
 

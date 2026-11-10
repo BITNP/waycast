@@ -5,12 +5,15 @@ capability, handle output_unit frames, answer with result frames.  Because
 it does not advertise a status channel, the hub creates no status tool for
 it (A19) - an explicit demonstration that status is optional.
 """
+
 from __future__ import annotations
 
 import argparse
 import asyncio
 import json
 from typing import Any
+
+from httpx2.websockets import WebSocketDisconnect
 
 from waycast.wire import make_frame
 
@@ -23,7 +26,10 @@ CAPABILITY = {
     "output": {
         "schema": {
             "type": "object",
-            "properties": {"text": {"type": "string"}, "tags": {"type": "array", "items": {"type": "string"}}},
+            "properties": {
+                "text": {"type": "string"},
+                "tags": {"type": "array", "items": {"type": "string"}},
+            },
             "required": ["text"],
             "additionalProperties": False,
         },
@@ -33,15 +39,27 @@ CAPABILITY = {
 
 
 async def _run(args: argparse.Namespace) -> None:
-    async with connect_module(hub_url=args.hub, token=args.token, capability=CAPABILITY) as ws:
-        async for raw in ws:
-            frame = json.loads(raw)
-            if frame["type"] != "output_unit":
-                continue
-            print("log_sink: " + json.dumps(frame["payload"], ensure_ascii=False), flush=True)
-            await ws.send(
-                make_frame("result", "log_sink", {"module": "log_sink", "status": "ok", "detail": "logged"}).model_dump_json()
-            )
+    async with connect_module(
+        hub_url=args.hub, token=args.token, capability=CAPABILITY
+    ) as ws:
+        try:
+            while True:
+                frame = json.loads(await ws.receive_text())
+                if frame["type"] != "output_unit":
+                    continue
+                print(
+                    "log_sink: " + json.dumps(frame["payload"], ensure_ascii=False),
+                    flush=True,
+                )
+                await ws.send_text(
+                    make_frame(
+                        "result",
+                        "log_sink",
+                        {"module": "log_sink", "status": "ok", "detail": "logged"},
+                    ).model_dump_json()
+                )
+        except WebSocketDisconnect:
+            pass  # hub closed the connection: the sink has nothing left to drain
 
 
 def main() -> None:

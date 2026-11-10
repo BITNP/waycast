@@ -5,11 +5,11 @@ against a fake websocket (no network, no model).  The example modules
 themselves are thin frame loops over connect_module; the wire format they
 produce is covered here and in test_wire.py.
 """
+
 from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Any
 
 import pytest
 
@@ -18,30 +18,37 @@ from waycast.wire import parse_frame
 
 
 class FakeWS:
-    """In-memory websocket capturing what the client sends."""
+    """In-memory websocket capturing what the client sends (httpx2 session API)."""
 
     def __init__(self) -> None:
         self.sent: list[str] = []
         self._acks: asyncio.Queue[str] = asyncio.Queue()
 
-    async def send(self, data: str) -> None:
+    async def send_text(self, data: str) -> None:
         self.sent.append(data)
 
-    async def recv(self) -> str:
+    async def receive_text(self) -> str:
         return await asyncio.wait_for(self._acks.get(), timeout=5.0)
 
 
-def _fake_connect(ws: FakeWS, captured: dict[str, str]):
-    """Patched websockets.connect: record the URI, yield the fake ws."""
+def _fake_open(ws: FakeWS, captured: dict[str, str]):
+    """Patched client._open_ws: record the URI, yield the fake ws."""
     import json
     from contextlib import asynccontextmanager
 
     @asynccontextmanager
-    async def factory(uri: str, **kwargs: Any):
+    async def factory(uri: str):
         captured["uri"] = uri
         # the hub's accept ack frame
         await ws._acks.put(
-            json.dumps({"protocol_version": 1, "type": "capability", "module": "x", "payload": {"accepted": True}})
+            json.dumps(
+                {
+                    "protocol_version": 1,
+                    "type": "capability",
+                    "module": "x",
+                    "payload": {"accepted": True},
+                }
+            )
         )
         yield ws
 
@@ -53,7 +60,7 @@ def test_connect_module_handshake_and_token_query(monkeypatch):
 
     ws = FakeWS()
     captured: dict[str, str] = {}
-    monkeypatch.setattr(client.websockets, "connect", _fake_connect(ws, captured))
+    monkeypatch.setattr(client, "_open_ws", _fake_open(ws, captured))
 
     capability = {
         "name": "alert",
@@ -84,13 +91,17 @@ def test_connect_module_no_token_query(monkeypatch):
 
     ws = FakeWS()
     captured: dict[str, str] = {}
-    monkeypatch.setattr(client.websockets, "connect", _fake_connect(ws, captured))
+    monkeypatch.setattr(client, "_open_ws", _fake_open(ws, captured))
 
     async def scenario():
         async with connect_module(
             hub_url="ws://127.0.0.1:9000",
             token="",
-            capability={"name": "x", "kind": "output", "output": {"schema": {}, "description": ""}},
+            capability={
+                "name": "x",
+                "kind": "output",
+                "output": {"schema": {}, "description": ""},
+            },
         ):
             pass
 
@@ -106,19 +117,30 @@ def test_connect_module_rejects_bad_ack(monkeypatch):
     ws = FakeWS()
 
     @asynccontextmanager
-    async def factory(uri: str, **kwargs: Any):
+    async def factory(uri: str):
         await ws._acks.put(
-            json.dumps({"protocol_version": 1, "type": "capability", "module": "x", "payload": {"accepted": False}})
+            json.dumps(
+                {
+                    "protocol_version": 1,
+                    "type": "capability",
+                    "module": "x",
+                    "payload": {"accepted": False},
+                }
+            )
         )
         yield ws
 
-    monkeypatch.setattr(client.websockets, "connect", factory)
+    monkeypatch.setattr(client, "_open_ws", factory)
 
     async def scenario():
         async with connect_module(
             hub_url="ws://127.0.0.1:8000",
             token="",
-            capability={"name": "x", "kind": "output", "output": {"schema": {}, "description": ""}},
+            capability={
+                "name": "x",
+                "kind": "output",
+                "output": {"schema": {}, "description": ""},
+            },
         ):
             pass
 

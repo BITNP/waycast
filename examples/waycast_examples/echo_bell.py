@@ -16,12 +16,15 @@ Run:
     PYTHONPATH=src:examples .venv/bin/python -m waycast_examples.echo_bell \
         --hub ws://127.0.0.1:8000 --token W
 """
+
 from __future__ import annotations
 
 import argparse
 import asyncio
 import json
 from typing import Any
+
+from httpx2.websockets import WebSocketDisconnect
 
 from waycast.wire import make_frame
 
@@ -41,41 +44,61 @@ CAPABILITY = {
         },
         "description": "echo a text payload to stdout (echo_bell)",
     },
-    "status": {"enabled": True, "description": "echo_bell liveness and delivered-unit count"},
+    "status": {
+        "enabled": True,
+        "description": "echo_bell liveness and delivered-unit count",
+    },
 }
 
 
 async def _reader(ws: Any) -> None:
     while True:
         line = await asyncio.to_thread(input, "echo_bell> ")
-        await ws.send(make_frame("input", "echo_bell", {"content": line}).model_dump_json())
+        await ws.send_text(
+            make_frame("input", "echo_bell", {"content": line}).model_dump_json()
+        )
 
 
 async def _run(args: argparse.Namespace) -> None:
-    async with connect_module(hub_url=args.hub, token=args.token, capability=CAPABILITY) as ws:
+    async with connect_module(
+        hub_url=args.hub, token=args.token, capability=CAPABILITY
+    ) as ws:
         reader = asyncio.create_task(_reader(ws))
         count = 0
-        async for raw in ws:
-            frame = json.loads(raw)
-            if frame["type"] == "output_unit":
-                count += 1
-                print("unit #" + str(count) + ": " + json.dumps(frame["payload"], ensure_ascii=False), flush=True)
-                await ws.send(
-                    make_frame(
-                        "result",
-                        "echo_bell",
-                        {"module": "echo_bell", "status": "ok", "detail": "echoed unit #" + str(count)},
-                    ).model_dump_json()
-                )
-            elif frame["type"] == "status_query":
-                await ws.send(
-                    make_frame(
-                        "status_result",
-                        "echo_bell",
-                        {"state": "up", "delivered_units": count},
-                        request_id=frame.get("request_id"),
-                    ).model_dump_json()
-                )
+        try:
+            while True:
+                frame = json.loads(await ws.receive_text())
+                if frame["type"] == "output_unit":
+                    count += 1
+                    print(
+                        "unit #"
+                        + str(count)
+                        + ": "
+                        + json.dumps(frame["payload"], ensure_ascii=False),
+                        flush=True,
+                    )
+                    await ws.send_text(
+                        make_frame(
+                            "result",
+                            "echo_bell",
+                            {
+                                "module": "echo_bell",
+                                "status": "ok",
+                                "detail": "echoed unit #" + str(count),
+                            },
+                        ).model_dump_json()
+                    )
+                elif frame["type"] == "status_query":
+                    await ws.send_text(
+                        make_frame(
+                            "status_result",
+                            "echo_bell",
+                            {"state": "up", "delivered_units": count},
+                            request_id=frame.get("request_id"),
+                        ).model_dump_json()
+                    )
+        except WebSocketDisconnect:
+            pass  # hub closed the connection: shut the module down
         reader.cancel()
 
 

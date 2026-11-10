@@ -39,10 +39,13 @@ class WaycastConfig:
     # "agent invocation failed" 错误日志，worker 继续消费下一条输入。
     llm_timeout_seconds: float = 120.0
     llm_max_retries: int = 1
-    # 逐请求透传给 OpenAI 兼容端的额外 JSON 字段（openai SDK extra_body），
-    # 用于 provider 专属开关。实测 maas.bit.edu.cn deepseek-v4-flash 默认开
+    # 逐请求透传给 OpenAI 兼容端的额外 JSON 字段（ChatOpenAI 官方一等字段，
+    # docstring 明示为 provider 专属参数的推荐传法，2026-11-11 查阅
+    # reference.langchain.com）。实测 maas.bit.edu.cn deepseek-v4-flash 默认开
     # 思考（reasoning_tokens 计入每次响应），置
-    # {"reasoning_effort": "none"} 后 reasoning_tokens=0（2026-11-10 实测）。
+    # {"reasoning_effort": "none"} 后 reasoning_tokens=0（2026-11-10 实测；
+    # none 为该端点方言值，非 OpenAI 标准档位，故不走原生 reasoning_effort
+    # 标准参数而是透传，保持核心对 provider 字节级透明）。
     # 空 dict = 不发任何额外字段。
     llm_extra_body: dict[str, Any] = field(default_factory=dict)
 

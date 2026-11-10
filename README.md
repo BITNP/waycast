@@ -62,7 +62,7 @@ export WAYCAST_HUB_TOKEN=""                                       # 可选，模
 | `WAYCAST_LLM_LOG_MESSAGES` | `incremental` | LLM 请求消息的记录方式：`incremental` 只打相对上次请求新增的消息，`full` 每次全量打印（历史前缀变化时自动回退全量） |
 | `WAYCAST_LLM_TIMEOUT` | `120` | 单次 LLM HTTP 请求超时（秒）；挂死的 provider 请求快速失败进入错误日志，不再按 openai SDK 默认 600s 静默阻塞整轮调用 |
 | `WAYCAST_LLM_MAX_RETRIES` | `1` | LLM 请求的 SDK 重试次数（openai SDK 默认为 2，叠在超时之上） |
-| `WAYCAST_LLM_EXTRA_BODY` | 空 | 逐请求透传给 LLM 端的额外 JSON 字段（openai SDK `extra_body`），用于 provider 专属开关；如 `{"reasoning_effort": "none"}` 关闭思考（实测 maas.bit.edu.cn deepseek-v4-flash 默认开思考，关闭后 `llm response usage` 行的 `reasoning_tokens` 归零） |
+| `WAYCAST_LLM_EXTRA_BODY` | 空 | 逐请求透传给 LLM 端的额外 JSON 字段（ChatOpenAI 官方一等字段 `extra_body`，官方推荐用它传 provider 专属参数），如 `{"reasoning_effort": "none"}` 关闭思考（实测 maas.bit.edu.cn deepseek-v4-flash 默认开思考，关闭后 `llm response usage` 行的 `reasoning_tokens` 归零） |
 
 ### 自定义 Agent 系统提示词
 

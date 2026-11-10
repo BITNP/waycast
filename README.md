@@ -32,7 +32,7 @@ Waycast 的核心（`src/`）只含本体：协议、Agent、hub、service、wir
 依赖用 [uv](https://docs.astral.sh/uv/) 管理，Python ≥ 3.12：
 
 ```bash
-uv sync
+uv sync --locked
 ```
 
 ### 配置
@@ -83,7 +83,7 @@ export WAYCAST_HUB_TOKEN=""                                       # 可选，模
 ### 启动服务
 
 ```bash
-uv run waycast serve
+uv run --locked waycast serve
 ```
 
 服务提供：

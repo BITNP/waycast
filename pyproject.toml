@@ -3,41 +3,53 @@ name = "waycast"
 version = "0.1.0"
 description = "A pluggable agent service: unified input in, arbitrary combination of output-module units out, fire-and-forget delivery with immediate results feeding the next invocation."
 readme = "README.md"
+requires-python = ">=3.12"
 authors = [
     { name = "noteas", email = "3818384646@qq.com" }
 ]
-requires-python = ">=3.12"
 dependencies = [
-    "langchain[openai,mcp]>=1.4.7",
-    "langchain-core>=1.7.1",
-    "langgraph>=1.2.18",
-    "langchain-openai>=1.7.3",
     "fastapi>=0.162.0",
-    "uvicorn[standard]>=0.54.0",
-    "httpx2>=2.16.0",
-    "jsonschema>=4.23.0",
-    "python-dotenv>=1.2.4",
+    "httpx2>=2.16,<3",
+    "jsonschema>=4.23,<5",
+    "langchain-core>=1.7.1",
+    "langchain-openai>=1.7.3",
+    "langchain[openai,mcp]>=1.4.7",
+    "langgraph>=1.2.18",
     "pydantic>=2.14.1",
+    "python-dotenv>=1,<2",
+    "uvicorn[standard]>=0.54.0",
 ]
 
 [project.scripts]
 waycast = "waycast.cli:main"
 
-[project.optional-dependencies]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
 dev = [
-    "pytest>=9.2.0",
+    "basedpyright>=1.31,<2",
+    "pytest>=8",
+    "ruff>=0.12",
 ]
 
-[build-system]
-requires = ["uv_build>=0.12.23,<0.13.0"]
-build-backend = "uv_build"
+[tool.hatch.build.targets.wheel]
+packages = ["src/waycast"]
 
 [tool.pytest.ini_options]
+minversion = "8.0"
 testpaths = ["tests"]
 pythonpath = ["src", "examples"]
+addopts = ["-ra", "--strict-config", "--strict-markers"]
+filterwarnings = ["error"]
 markers = [
     "real_model: runs against the real model configured in .env (network required)",
 ]
 
-# lint 规则集 = ruff 内置默认（四仓一致，不另选规则族；生效规则集由 uv.lock 钉死的 ruff 版本决定）。
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+src = ["src", "tests", "examples"]
 
+# lint 规则集 = ruff 内置默认（四仓一致，不另选规则族；生效规则集由 uv.lock 钉死的 ruff 版本决定）。

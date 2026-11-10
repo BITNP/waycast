@@ -13,9 +13,9 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import pytest
-from waycast_examples.client import connect_module
 
 from waycast.wire import parse_frame
+from waycast_examples.client import connect_module
 
 
 class FakeWS:

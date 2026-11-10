@@ -38,6 +38,18 @@ def test_upsert_replaces_same_name():
     assert cat.status_tools() == [cat.get("notify")]
 
 
+def test_status_tools_order_stable_across_reconnects():
+    # reconnection moves a module to the end of the internal dict; tool
+    # registration order must not shuffle (prompt prefix caching, ADR-0014)
+    cat = CapabilityCatalog()
+    cat.upsert(_cap("presenter", status=True))
+    cat.upsert(_cap("voice_input", status=True))
+    before = [m.name for m in cat.status_tools()]
+    cat.remove("presenter")
+    cat.upsert(_cap("presenter", status=True))
+    assert [m.name for m in cat.status_tools()] == before == ["presenter", "voice_input"]
+
+
 def test_remove():
     cat = CapabilityCatalog()
     cat.upsert(_cap("notify"))

@@ -114,9 +114,17 @@ class CapabilityCatalog:
         return None
 
     def status_tools(self) -> list[ModuleEndpoint]:
-        """Endpoints that advertise an enabled status-query ability (A19)."""
+        """Endpoints that advertise an enabled status-query ability (A19).
 
-        return [m for m in self._modules.values() if m.status_enabled]
+        Sorted by module name (like the describe_* renderers): reconnecting a
+        module moves it to the end of the internal dict, and tool registration
+        order is serialized into the request prefix - a shuffled order would
+        break KV prefix caching (ADR-0014).
+        """
+
+        return [
+            self._modules[n] for n in sorted(self._modules) if self._modules[n].status_enabled
+        ]
 
     def describe_output_modules(self) -> str:
         """Markdown-ish catalog of connected output modules + their JSON Schemas."""

@@ -4,7 +4,7 @@ Waycast 是一个长期运行的 Agent 服务：输入模块产生统一输入�
 
 Waycast 也是树莓娘（Raspberry Girl）项目的唯一核心（ADR-0009）：树莓娘的语音、IM、弹幕输入作为 Waycast 输入模块；表情、动作、语音合成、PPT 显示与翻页由聚合输出模块承担（ADR-0010）；话权与打断由核心 Agent 自行决定（ADR-0011）；RAG 等核心增强在 Waycast 核心内实现（ADR-0012）。业务模块各自放在独立仓库中，本仓库只承载核心；旧 vtuber-* 仓库只读保留，不修改、不删除、不搬迁。
 
-在 Waycast 仓库里开发、修改时，先读 [README.md](README.md)（用法）、[GLOSSARY.md](GLOSSARY.md)（术语，含 Raspberry Girl context 段）、[docs/adr/](docs/adr/)（决策），再动手。
+在 Waycast 仓库里开发、修改时，先读 [README.md](README.md)（用户文档：安装、配置、运行）、[DEVELOPMENT.md](DEVELOPMENT.md)（开发者文档：关键设计点、wire 协议与模块编写、测试、代码结构）、[GLOSSARY.md](GLOSSARY.md)（术语，含 Raspberry Girl context 段）、[docs/adr/](docs/adr/)（决策），再动手。
 
 ## 原则
 

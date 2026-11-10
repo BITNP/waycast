@@ -7,6 +7,11 @@ from __future__ import annotations
 import contextlib
 import os
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import httpx2
+    from langchain_openai import ChatOpenAI
 
 with contextlib.suppress(Exception):  # dotenv is optional at import time
     from dotenv import load_dotenv
@@ -40,7 +45,9 @@ class WaycastConfig:
         )
 
 
-def make_model(config: WaycastConfig, http_async_client=None):
+def make_model(
+    config: WaycastConfig, http_async_client: httpx2.AsyncClient | None = None
+) -> ChatOpenAI:
     """Build a ChatOpenAI model pointed at config.base_url.
 
     Uses Chat Completions (the standard OpenAI-compatible path) with the
@@ -54,6 +61,7 @@ def make_model(config: WaycastConfig, http_async_client=None):
     their own client so closing it does not poison the shared cache.
     """
     from langchain_openai import ChatOpenAI
+    from pydantic import SecretStr
 
     if not config.base_url or not config.api_key:
         raise RuntimeError(
@@ -62,7 +70,7 @@ def make_model(config: WaycastConfig, http_async_client=None):
         )
     return ChatOpenAI(
         base_url=config.base_url,
-        api_key=config.api_key,
+        api_key=SecretStr(config.api_key),
         model=config.model_name,
         http_async_client=http_async_client,
     )

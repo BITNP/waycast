@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 
 
-def read_user_system_prompt(path: str | os.PathLike | None = None) -> str | None:
+def read_user_system_prompt(path: str | os.PathLike[str] | None = None) -> str | None:
     """Return the plain-text user system prompt, or ``None`` when absent.
 
     When ``path`` is None, use ``WAYCAST_AGENT_CONFIG`` if set, else

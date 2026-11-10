@@ -52,6 +52,13 @@ markers = [
     "real_model: runs against the real model configured in .env (network required)",
 ]
 
+[tool.pyright]
+typeCheckingMode = "strict"
+include = ["src"]
+venvPath = "."
+venv = ".venv"
+reportMissingTypeStubs = "none"
+
 [tool.ruff]
 target-version = "py312"
 line-length = 88

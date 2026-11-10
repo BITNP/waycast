@@ -41,6 +41,7 @@ from langchain.agents.middleware import (
 )
 from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.tools import tool
+from langgraph.types import Command
 
 from waycast.capabilities import CapabilityCatalog, ModuleEndpoint
 from waycast.prompt_config import build_system_prompt_with_user
@@ -210,8 +211,8 @@ class CapabilityBridge(AgentMiddleware):
     async def awrap_tool_call(
         self,
         request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage]],
-    ) -> ToolMessage:
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]],
+    ) -> ToolMessage | Command[Any]:
         """Async interceptor for runtime-registered status tools (A15/A19)."""
         impl = self._status_tool_impls.get(request.tool_call["name"])
         if impl is None:

@@ -45,7 +45,7 @@ class Service:
         self.agent = agent
         self.catalog = catalog
         self.queue: asyncio.Queue[UnifiedInput] = asyncio.Queue(maxsize=queue_size)
-        self._worker_task: asyncio.Task | None = None
+        self._worker_task: asyncio.Task[None] | None = None
         self._last_results: dict[str, Any] = {}
 
         self.hub = Hub(

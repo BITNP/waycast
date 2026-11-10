@@ -66,7 +66,7 @@ class Hub:
         self._enqueue_input = enqueue_input
         self._on_result = on_result
         self._connections: dict[str, ModuleConnection] = {}
-        self._status_futures: dict[str, asyncio.Future] = {}
+        self._status_futures: dict[str, asyncio.Future[dict[str, Any]]] = {}
 
     # -- connection lifecycle -------------------------------------------
 
@@ -271,7 +271,7 @@ class Hub:
             return None
         request_id = uuid.uuid4().hex
         loop = asyncio.get_running_loop()
-        fut: asyncio.Future = loop.create_future()
+        fut: asyncio.Future[dict[str, Any]] = loop.create_future()
         self._status_futures[request_id] = fut
         try:
             await conn.ws.send_text(

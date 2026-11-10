@@ -16,8 +16,9 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from langchain.agents import create_agent
+from langchain.agents import create_agent  # pyright: ignore[reportUnknownVariableType] - 库签名的泛型参数部分未定型
 from langchain.agents.middleware import SummarizationMiddleware
+from langchain.agents.middleware.summarization import ContextSize, TriggerClause
 from langchain.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
@@ -44,8 +45,11 @@ class AgentOutput(BaseModel):
 # single-thread history (ADR-0005) when either bound is hit.  The token
 # counter is approximate, so a message-count bound guards CJK-heavy chats
 # where characters-per-token underestimates.
-SUMMARIZE_TRIGGER = [("tokens", 60_000), ("messages", 240)]
-SUMMARIZE_KEEP = ("messages", 40)
+SUMMARIZE_TRIGGER: list[ContextSize | TriggerClause] = [
+    ("tokens", 60_000),
+    ("messages", 240),
+]
+SUMMARIZE_KEEP: ContextSize = ("messages", 40)
 
 
 def _make_checkpointer() -> InMemorySaver:
@@ -101,7 +105,9 @@ class Agent:
             user_system_prompt=user_system_prompt,
         )
         base = base_system_prompt or BASE_SYSTEM_PROMPT
-        self.langchain_agent = create_agent(
+        # create_agent 的图类型带未定型泛型参数（库限制），此处按 Any 承载，
+        # 调用点只传本仓库自己构造的 dict，运行时契约由 wire 测试保证。
+        self.langchain_agent: Any = create_agent(
             model=model,
             tools=self.tools,
             system_prompt=base,

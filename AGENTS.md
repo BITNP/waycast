@@ -28,7 +28,7 @@ Waycast 也是树莓娘（Raspberry Girl）项目的唯一核心（ADR-0009）�
 
 **网络审批。** 所有网络访问都必须先申请审批（require_escalated 并附理由），包括对本机回环（localhost / 127.0.0.1）的连接；沙箱默认无网络权限，不绕过审批另寻联网途径。
 
-**验证。** 依赖由 uv 管理在 `.venv`。单元层（wire 协议、capability 目录、hub 帧路由、prompt 拼接、CLI 装配）可用本地假模块连接离线测试；涉及 Agent 模型行为（结构化输出、多轮工具调用、输出单元派发、结果进入下一轮）必须跑真实模型，测试用真实冒烟覆盖。跑 `uv run --locked python -m pytest -q`，路由层测试必须全绿；真实冒烟用 `.env` 里已配置的 credentials（`WAYCAST_BASE_URL` / `WAYCAST_API_KEY`）执行。
+**验证。** 依赖由 uv 管理在 `.venv`。单元层（wire 协议、capability 目录、hub 帧路由、prompt 拼接、CLI 装配）可用本地假模块连接离线测试；涉及 Agent 模型行为（结构化输出、多轮工具调用、输出单元派发、结果进入下一轮）必须跑真实模型，测试用真实冒烟覆盖。跑 `uv run --locked python -m pytest -q`，路由层测试必须全绿；静态检查跑 `uv run --locked ruff check .`、`uv run --locked ruff format --check .` 与 `uv run --locked basedpyright`（strict，只查 src，与三模块仓一致），必须零告警；真实冒烟用 `.env` 里已配置的 credentials（`WAYCAST_BASE_URL` / `WAYCAST_API_KEY`）执行。
 
 **先查自己。** 行为不符合预期（异步挂起、结果丢失、结构化输出不对）时，先查本仓库代码与测试，以代码和运行结果为事实依据；确认是自己的问题再谈外部原因。
 

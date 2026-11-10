@@ -16,11 +16,9 @@ envelope and validates capability advertisements.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
-from waycast.state import OutputResult  # noqa: F401  (payload models for frames)
 
 PROTOCOL_VERSION = 1
 
@@ -149,19 +147,21 @@ def parse_frame(raw: str | bytes | dict[str, Any]) -> WireFrame:
     """
     from waycast.protocols import WaycastError
 
-    if isinstance(raw, (str, bytes)):
+    data: dict[str, Any]
+    if isinstance(raw, dict):
+        data = raw
+    else:
+        # 非 str/bytes 的杂类型会在这里被 json.loads 抛错并收敛为 WaycastError。
         try:
             import json
 
-            data = json.loads(raw)
+            parsed = json.loads(raw)
         except Exception as exc:
             raise WaycastError(f"malformed wire frame: {exc}") from exc
-    elif isinstance(raw, dict):
-        data = raw
-    else:
-        raise WaycastError(f"unsupported frame raw type: {type(raw)!r}")
-    if not isinstance(data, dict):
-        raise WaycastError("wire frame must be a JSON object")
+        if not isinstance(parsed, dict):
+            raise WaycastError("wire frame must be a JSON object")
+        # 值层面的校验交给 WireFrame（pydantic），这里只做形状收窄。
+        data = cast("dict[str, Any]", parsed)
     try:
         return WireFrame.model_validate(data)
     except Exception as exc:

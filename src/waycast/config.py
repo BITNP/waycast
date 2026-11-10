@@ -5,9 +5,10 @@ model from environment or a .env file.
 from __future__ import annotations
 
 import contextlib
+import json
 import os
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     import httpx2
@@ -38,6 +39,10 @@ class WaycastConfig:
     # "agent invocation failed" 错误日志，worker 继续消费下一条输入。
     llm_timeout_seconds: float = 120.0
     llm_max_retries: int = 1
+    # 逐请求透传给 OpenAI 兼容端的额外 JSON 字段（openai SDK extra_body），
+    # 用于 provider 专属开关，如关闭服务端默认开启的思考模式：
+    # {"thinking": {"type": "disabled"}}。空 dict = 不发任何额外字段。
+    llm_extra_body: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_env(cls):
@@ -57,7 +62,25 @@ class WaycastConfig:
             llm_max_retries=int(
                 os.getenv("WAYCAST_LLM_MAX_RETRIES", str(cls.llm_max_retries))
             ),
+            llm_extra_body=_parse_extra_body(os.getenv("WAYCAST_LLM_EXTRA_BODY", "")),
         )
+
+
+def _parse_extra_body(raw: str) -> dict[str, Any]:
+    """Parse WAYCAST_LLM_EXTRA_BODY (a JSON object) into the extra_body dict.
+
+    Blank = no extra fields.  Anything that is not a JSON object is a config
+    error and must fail loudly at startup rather than be silently dropped.
+    """
+    if not raw.strip():
+        return {}
+    parsed: Any = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise TypeError(
+            "WAYCAST_LLM_EXTRA_BODY must be a JSON object, e.g."
+            ' {"thinking": {"type": "disabled"}}'
+        )
+    return cast("dict[str, Any]", parsed)
 
 
 def make_model(
@@ -80,6 +103,10 @@ def make_model(
     client (shared per base URL).  Callers that manage client lifetime
     themselves (e.g. tests that close their client per scenario) should pass
     their own client so closing it does not poison the shared cache.
+
+    ``llm_extra_body`` (if non-empty) is forwarded as ``extra_body`` so every
+    request carries provider-specific fields verbatim (e.g. disabling a
+    provider-default thinking mode).
     """
     from langchain_openai import ChatOpenAI
     from pydantic import SecretStr
@@ -95,6 +122,7 @@ def make_model(
         model=config.model_name,
         timeout=config.llm_timeout_seconds,
         max_retries=config.llm_max_retries,
+        extra_body=config.llm_extra_body or None,
         http_async_client=http_async_client,
     )
 

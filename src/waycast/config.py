@@ -46,7 +46,8 @@ def make_model(config: WaycastConfig, http_async_client=None):
     Uses Chat Completions (the standard OpenAI-compatible path) with the
     user-supplied base URL and API key.  Raises if credentials are missing.
 
-    ``http_async_client`` (optional) injects a pre-built httpx.AsyncClient;
+    ``http_async_client`` (optional) injects a pre-built httpx2.AsyncClient
+    (openai SDK 3.x is built on httpx2);
     when omitted ChatOpenAI uses langchain_openai's process-cached default
     client (shared per base URL).  Callers that manage client lifetime
     themselves (e.g. tests that close their client per scenario) should pass

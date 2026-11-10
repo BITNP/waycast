@@ -10,8 +10,8 @@ They cover the Agent behaviors that a fake model cannot exercise honestly:
 - the optional per-module status tool round-trip (A15/A19)
 - output results feeding the next invocation (ADR-0002)
 
-Each test runs inside one asyncio.run and closes the model's httpx
-async client (an injected per-test httpx.AsyncClient) on that same
+Each test runs inside one asyncio.run and closes the model's httpx2
+async client (an injected per-test httpx2.AsyncClient) on that same
 loop, so the loop exits cleanly and the per-test client never touches
 langchain_openai's process-cached default client.
 """
@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(os.getcwd()) / ".env")
 
-import httpx
+import httpx2
 
 from waycast.agent import Agent  # noqa: E402
 from waycast.capabilities import CapabilityCatalog  # noqa: E402
@@ -74,7 +74,7 @@ def test_real_model_tool_call_and_unit_dispatch():
     dispatched: list[tuple[str, dict]] = []
 
     async def scenario():
-        client = httpx.AsyncClient()
+        client = httpx2.AsyncClient()
         agent = Agent(cat, model=make_model(cfg, http_async_client=client), tools=default_tools())
         try:
             async def adispatch(module: str, payload: dict):
@@ -124,7 +124,7 @@ def test_real_model_status_tool_roundtrip():
     seen_status: list[str] = []
 
     async def scenario():
-        client = httpx.AsyncClient()
+        client = httpx2.AsyncClient()
         agent = Agent(cat, model=make_model(cfg, http_async_client=client), tools=default_tools())
         try:
             async def status_query(module: str):
@@ -159,7 +159,7 @@ def test_real_model_output_results_feed_next_invocation():
     cat = _catalog()
 
     async def scenario():
-        client = httpx.AsyncClient()
+        client = httpx2.AsyncClient()
         agent = Agent(cat, model=make_model(cfg, http_async_client=client), tools=default_tools())
         try:
             async def adispatch(module: str, payload: dict):

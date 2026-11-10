@@ -33,6 +33,11 @@ class WaycastConfig:
     # LLM 请求消息的 DEBUG 记录方式：incremental 只打相对上次请求新增的消息，
     # full 每次全量打（校验与回退在 CapabilityBridge，见 bridge.py）。
     llm_log_messages: str = "incremental"
+    # 单次 LLM HTTP 请求超时与 SDK 重试次数。openai SDK 默认 600s×(1+2 retries)
+    # 能把挂死的 provider 请求静默阻塞近半小时；收紧后失败快速进入
+    # "agent invocation failed" 错误日志，worker 继续消费下一条输入。
+    llm_timeout_seconds: float = 120.0
+    llm_max_retries: int = 1
 
     @classmethod
     def from_env(cls):
@@ -46,6 +51,12 @@ class WaycastConfig:
             port=int(os.getenv("WAYCAST_PORT", "8000")),
             thread_id=os.getenv("WAYCAST_THREAD_ID", "waycast-global"),
             llm_log_messages=os.getenv("WAYCAST_LLM_LOG_MESSAGES", "incremental"),
+            llm_timeout_seconds=float(
+                os.getenv("WAYCAST_LLM_TIMEOUT", str(cls.llm_timeout_seconds))
+            ),
+            llm_max_retries=int(
+                os.getenv("WAYCAST_LLM_MAX_RETRIES", str(cls.llm_max_retries))
+            ),
         )
 
 
@@ -56,6 +67,12 @@ def make_model(
 
     Uses Chat Completions (the standard OpenAI-compatible path) with the
     user-supplied base URL and API key.  Raises if credentials are missing.
+
+    ``timeout`` / ``max_retries`` come from the config (fail fast on a stalled
+    provider instead of the openai SDK default 600s × 3 attempts, which would
+    silently block the invocation worker for up to ~30 minutes).  They apply
+    to the client ChatOpenAI builds itself; an injected ``http_async_client``
+    carries its own settings instead.
 
     ``http_async_client`` (optional) injects a pre-built httpx2.AsyncClient
     (openai SDK 3.x is built on httpx2);
@@ -76,6 +93,8 @@ def make_model(
         base_url=config.base_url,
         api_key=SecretStr(config.api_key),
         model=config.model_name,
+        timeout=config.llm_timeout_seconds,
+        max_retries=config.llm_max_retries,
         http_async_client=http_async_client,
     )
 

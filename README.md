@@ -60,6 +60,8 @@ export WAYCAST_HUB_TOKEN=""                                       # 可选，模
 | `WAYCAST_LOG_LEVEL` | `INFO` | 本服务日志级别（`DEBUG` 输出输入帧、LLM 请求/响应、单元派发与 result 帧等调试信息） |
 | `WAYCAST_DEPS_LOG_LEVEL` | `WARNING` | 第三方依赖日志级别（httpx/openai/websockets 等；uvicorn 访问日志仅在放开到 `INFO`/`DEBUG` 时才输出） |
 | `WAYCAST_LLM_LOG_MESSAGES` | `incremental` | LLM 请求消息的记录方式：`incremental` 只打相对上次请求新增的消息，`full` 每次全量打印（历史前缀变化时自动回退全量） |
+| `WAYCAST_LLM_TIMEOUT` | `120` | 单次 LLM HTTP 请求超时（秒）；挂死的 provider 请求快速失败进入错误日志，不再按 openai SDK 默认 600s 静默阻塞整轮调用 |
+| `WAYCAST_LLM_MAX_RETRIES` | `1` | LLM 请求的 SDK 重试次数（openai SDK 默认为 2，叠在超时之上） |
 
 ### 自定义 Agent 系统提示词
 

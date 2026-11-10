@@ -11,6 +11,7 @@ message (ADR-0002 / ADR-0014).
 
 WebSocket is the only input channel.
 """
+
 from __future__ import annotations
 
 import asyncio

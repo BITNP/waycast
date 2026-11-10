@@ -5,6 +5,7 @@ every --interval seconds constructed from the current UTC time.  It
 does not receive output_unit frames (kind=input), demonstrating a pure
 input module.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -25,11 +26,19 @@ CAPABILITY = {
 
 
 async def _run(args: argparse.Namespace) -> None:
-    async with connect_module(hub_url=args.hub, token=args.token, capability=CAPABILITY) as ws:
+    async with connect_module(
+        hub_url=args.hub, token=args.token, capability=CAPABILITY
+    ) as ws:
         while True:
             now = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime())
             print("cron_source tick: " + now, flush=True)
-            await ws.send(make_frame("input", "cron_source", {"content": "tick " + now, "metadata": {"interval": args.interval}}).model_dump_json())
+            await ws.send(
+                make_frame(
+                    "input",
+                    "cron_source",
+                    {"content": "tick " + now, "metadata": {"interval": args.interval}},
+                ).model_dump_json()
+            )
             await asyncio.sleep(args.interval)
 
 

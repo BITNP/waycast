@@ -5,6 +5,7 @@
 Reads WAYCAST_BASE_URL / WAYCAST_API_KEY (or OPENAI_*) and WAYCAST_HUB_TOKEN
 from the environment.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -41,7 +42,9 @@ def _configure_logging() -> str:
     dependency level so the caller can decide whether uvicorn keeps access logs."""
     level = os.getenv("WAYCAST_LOG_LEVEL", "INFO").strip().upper() or "INFO"
     deps = os.getenv("WAYCAST_DEPS_LOG_LEVEL", "WARNING").strip().upper() or "WARNING"
-    logging.basicConfig(level=level, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.basicConfig(
+        level=level, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+    )
     for name in _THIRD_PARTY_LOGGERS:
         logging.getLogger(name).setLevel(deps)
     return deps

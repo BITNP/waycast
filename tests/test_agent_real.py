@@ -15,6 +15,7 @@ async client (an injected per-test httpx2.AsyncClient) on that same
 loop, so the loop exits cleanly and the per-test client never touches
 langchain_openai's process-cached default client.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -75,8 +76,11 @@ def test_real_model_tool_call_and_unit_dispatch():
 
     async def scenario():
         client = httpx2.AsyncClient()
-        agent = Agent(cat, model=make_model(cfg, http_async_client=client), tools=default_tools())
+        agent = Agent(
+            cat, model=make_model(cfg, http_async_client=client), tools=default_tools()
+        )
         try:
+
             async def adispatch(module: str, payload: dict):
                 dispatched.append((module, payload))
                 return OutputResult(module=module, status="ok", detail="dispatched")
@@ -98,14 +102,20 @@ def test_real_model_tool_call_and_unit_dispatch():
             assert len(res.units) >= 1
             assert res.units[0].module == "time_bell"
             assert "text" in res.units[0].payload
-            assert "UTC" in res.units[0].payload["text"] or "20" in res.units[0].payload["text"]
+            assert (
+                "UTC" in res.units[0].payload["text"]
+                or "20" in res.units[0].payload["text"]
+            )
             assert dispatched == [(u.module, u.payload) for u in res.units]
             assert all(r.status == "ok" for r in res.results)
 
             # empty-units path: the model must emit no units when told nothing to do
             res2 = await asyncio.wait_for(
                 agent.ainvoke(
-                    UnifiedInput(content="There is nothing to do; output empty units.", source="cli")
+                    UnifiedInput(
+                        content="There is nothing to do; output empty units.",
+                        source="cli",
+                    )
                 ),
                 timeout=120,
             )
@@ -125,8 +135,11 @@ def test_real_model_status_tool_roundtrip():
 
     async def scenario():
         client = httpx2.AsyncClient()
-        agent = Agent(cat, model=make_model(cfg, http_async_client=client), tools=default_tools())
+        agent = Agent(
+            cat, model=make_model(cfg, http_async_client=client), tools=default_tools()
+        )
         try:
+
             async def status_query(module: str):
                 seen_status.append(module)
                 return {"state": "up", "since": "boot"}
@@ -160,13 +173,18 @@ def test_real_model_output_results_feed_next_invocation():
 
     async def scenario():
         client = httpx2.AsyncClient()
-        agent = Agent(cat, model=make_model(cfg, http_async_client=client), tools=default_tools())
+        agent = Agent(
+            cat, model=make_model(cfg, http_async_client=client), tools=default_tools()
+        )
         try:
+
             async def adispatch(module: str, payload: dict):
                 # Simulate an unreachable module: the Agent layer only
                 # accumulates failed dispatches; the hub accumulates the
                 # success path (ADR-0002).
-                return OutputResult(module=module, status="error", detail="simulated failure")
+                return OutputResult(
+                    module=module, status="error", detail="simulated failure"
+                )
 
             agent.set_adispatch(adispatch)
 
@@ -180,12 +198,16 @@ def test_real_model_output_results_feed_next_invocation():
                 timeout=120,
             )
             assert len(r1.units) == 1
-            assert any(r.module == "time_bell" for r in agent.pending_output_results.results)
+            assert any(
+                r.module == "time_bell" for r in agent.pending_output_results.results
+            )
             assert r1.results and all(r2.status != "ok" for r2 in r1.results)
 
             r2 = await asyncio.wait_for(
                 agent.ainvoke(
-                    UnifiedInput(content="Nothing else to do; output empty units.", source="cli")
+                    UnifiedInput(
+                        content="Nothing else to do; output empty units.", source="cli"
+                    )
                 ),
                 timeout=120,
             )
@@ -196,7 +218,9 @@ def test_real_model_output_results_feed_next_invocation():
             # and this invocation delivered an empty feed of its own
             r3 = await asyncio.wait_for(
                 agent.ainvoke(
-                    UnifiedInput(content="Nothing else to do; output empty units.", source="cli")
+                    UnifiedInput(
+                        content="Nothing else to do; output empty units.", source="cli"
+                    )
                 ),
                 timeout=120,
             )
@@ -206,4 +230,3 @@ def test_real_model_output_results_feed_next_invocation():
             await client.aclose()
 
     asyncio.run(scenario())
-

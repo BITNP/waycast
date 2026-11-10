@@ -1,4 +1,5 @@
 """Capability catalog: upsert/remove, input/output/status views, schema."""
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,13 @@ def _cap(name="notify", kind="output", schema=None, status=False):
         payload["input"] = {"description": f"{name} input"}
     if kind in ("output", "both"):
         payload["output"] = {
-            "schema": schema or {"type": "object", "properties": {"message": {"type": "string"}}, "required": ["message"], "additionalProperties": False},
+            "schema": schema
+            or {
+                "type": "object",
+                "properties": {"message": {"type": "string"}},
+                "required": ["message"],
+                "additionalProperties": False,
+            },
             "description": f"send {name}",
         }
     if status:
@@ -47,7 +54,9 @@ def test_status_tools_order_stable_across_reconnects():
     before = [m.name for m in cat.status_tools()]
     cat.remove("presenter")
     cat.upsert(_cap("presenter", status=True))
-    assert [m.name for m in cat.status_tools()] == before == ["presenter", "voice_input"]
+    assert (
+        [m.name for m in cat.status_tools()] == before == ["presenter", "voice_input"]
+    )
 
 
 def test_remove():
@@ -70,7 +79,12 @@ def test_cache_input_schema_validation():
     echo = _cap(
         "echo",
         kind="both",
-        schema={"type": "object", "properties": {"text": {"type": "string"}}, "required": ["text"], "additionalProperties": False},
+        schema={
+            "type": "object",
+            "properties": {"text": {"type": "string"}},
+            "required": ["text"],
+            "additionalProperties": False,
+        },
         status=True,
     )
     cat.upsert(echo)

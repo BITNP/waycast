@@ -5,6 +5,7 @@ using an in-memory websocket pair (there is no HTTP server, no uvicorn, no
 fake model).  The hub never touches the Agent model, so this stays offline;
 Agent model behavior is covered by real-model smokes.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -90,7 +91,9 @@ def test_first_frame_must_be_capability():
         task = asyncio.create_task(hub.accept(ws))
         await asyncio.sleep(0.01)
         # hub is now waiting for the first text
-        await ws._client.put(make_frame("input", "echo", {"content": "x"}).model_dump_json())
+        await ws._client.put(
+            make_frame("input", "echo", {"content": "x"}).model_dump_json()
+        )
         # hub should reject; the accept task should end
         try:
             await asyncio.wait_for(task, timeout=2.0)
@@ -110,11 +113,19 @@ def test_capability_and_input_enqueue():
         ws.query_params = {"token": "tok"}
         task = asyncio.create_task(hub.accept(ws))
         await asyncio.sleep(0.01)
-        await ws._client.put(make_frame("capability", "echo", echo_cap, request_id=None).model_dump_json())
+        await ws._client.put(
+            make_frame(
+                "capability", "echo", echo_cap, request_id=None
+            ).model_dump_json()
+        )
         ack = parse_frame(await ws.recv())
         assert ack.payload == {"accepted": True}
         # now the module is in the read loop; send an input (allow a beat)
-        await ws._client.put(make_frame("input", "echo", {"content": "ping", "source": "echo"}).model_dump_json())
+        await ws._client.put(
+            make_frame(
+                "input", "echo", {"content": "ping", "source": "echo"}
+            ).model_dump_json()
+        )
         for _ in range(50):
             if received:
                 break
@@ -150,7 +161,11 @@ def test_dispatch_validates_and_sends():
         ws.query_params = {"token": "tok"}
         task = asyncio.create_task(hub.accept(ws))
         await asyncio.sleep(0.01)
-        await ws._client.put(make_frame("capability", "echo", echo_cap, request_id=None).model_dump_json())
+        await ws._client.put(
+            make_frame(
+                "capability", "echo", echo_cap, request_id=None
+            ).model_dump_json()
+        )
         await ws.recv()  # ack
         # dispatch from the hub side
         out = await hub.dispatch_unit("echo", {"text": "hi"})
@@ -171,7 +186,11 @@ def test_dispatch_rejects_bad_schema():
         ws.query_params = {"token": "tok"}
         task = asyncio.create_task(hub.accept(ws))
         await asyncio.sleep(0.01)
-        await ws._client.put(make_frame("capability", "echo", echo_cap, request_id=None).model_dump_json())
+        await ws._client.put(
+            make_frame(
+                "capability", "echo", echo_cap, request_id=None
+            ).model_dump_json()
+        )
         await ws.recv()  # ack
         out = await hub.dispatch_unit("echo", {"text": 123})
         assert out.status == "error"
@@ -189,7 +208,11 @@ def test_dispatch_unknown_module():
         ws.query_params = {"token": "tok"}
         task = asyncio.create_task(hub.accept(ws))
         await asyncio.sleep(0.01)
-        await ws._client.put(make_frame("capability", "echo", echo_cap, request_id=None).model_dump_json())
+        await ws._client.put(
+            make_frame(
+                "capability", "echo", echo_cap, request_id=None
+            ).model_dump_json()
+        )
         await ws.recv()
         out = await hub.dispatch_unit("nope", {"text": "x"})
         assert out.status == "error"
@@ -207,7 +230,11 @@ def test_status_roundtrip():
         ws.query_params = {"token": "tok"}
         task = asyncio.create_task(hub.accept(ws))
         await asyncio.sleep(0.01)
-        await ws._client.put(make_frame("capability", "echo", echo_cap, request_id=None).model_dump_json())
+        await ws._client.put(
+            make_frame(
+                "capability", "echo", echo_cap, request_id=None
+            ).model_dump_json()
+        )
         await ws.recv()  # ack
         # status query
         qtask = asyncio.create_task(hub.query_status("echo"))
@@ -215,7 +242,9 @@ def test_status_roundtrip():
         assert sq.type == "status_query"
         assert sq.request_id is not None
         await ws._client.put(
-            make_frame("status_result", "echo", {"state": "up"}, request_id=sq.request_id).model_dump_json()
+            make_frame(
+                "status_result", "echo", {"state": "up"}, request_id=sq.request_id
+            ).model_dump_json()
         )
         result = await asyncio.wait_for(qtask, timeout=5.0)
         assert result == {"state": "up"}
@@ -232,10 +261,16 @@ def test_catalog_output_accumulates_result_frames():
         ws.query_params = {"token": "tok"}
         task = asyncio.create_task(hub.accept(ws))
         await asyncio.sleep(0.01)
-        await ws._client.put(make_frame("capability", "echo", echo_cap, request_id=None).model_dump_json())
+        await ws._client.put(
+            make_frame(
+                "capability", "echo", echo_cap, request_id=None
+            ).model_dump_json()
+        )
         await ws.recv()
         await ws._client.put(
-            make_frame("result", "echo", {"module": "echo", "status": "ok", "detail": "done"}).model_dump_json()
+            make_frame(
+                "result", "echo", {"module": "echo", "status": "ok", "detail": "done"}
+            ).model_dump_json()
         )
         for _ in range(50):
             if results:

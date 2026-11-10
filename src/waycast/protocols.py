@@ -10,6 +10,7 @@ defined in ``waycast.wire``; this module stays transport-independent.
 There is no in-process registry here any more: modules are network clients,
 and the hub keeps a ``CapabilityCatalog`` of connected modules instead.
 """
+
 from __future__ import annotations
 
 from typing import Any

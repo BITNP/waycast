@@ -18,6 +18,7 @@ owns the module connections and keeps the capability catalog in sync:
 The hub layer is transport-specific (WebSocket); the frame model in
 ``waycast.wire`` is transport-independent.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -254,7 +255,9 @@ class Hub:
                 status="error",
                 detail=f"dispatch failed: {exc}",
             )
-        log.debug("unit dispatched to %s: %s", module, json.dumps(payload, ensure_ascii=False))
+        log.debug(
+            "unit dispatched to %s: %s", module, json.dumps(payload, ensure_ascii=False)
+        )
         return OutputResult(module=module, status="ok", detail="dispatched")
 
     async def query_status(self, module: str) -> dict[str, Any] | None:
@@ -274,7 +277,9 @@ class Hub:
         self._status_futures[request_id] = fut
         try:
             await conn.ws.send_text(
-                make_frame("status_query", module, {}, request_id=request_id).model_dump_json()
+                make_frame(
+                    "status_query", module, {}, request_id=request_id
+                ).model_dump_json()
             )
             return await asyncio.wait_for(fut, timeout=10.0)
         except Exception:

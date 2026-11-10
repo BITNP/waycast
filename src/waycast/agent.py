@@ -10,6 +10,7 @@ feed rides at the head of the next invocation's human message, once, and
 ages out with the history (ADR-0002 / ADR-0014).  Output units are routed
 through the hub to the owning module connections.
 """
+
 from __future__ import annotations
 
 from typing import Any, Awaitable, Callable
@@ -84,7 +85,9 @@ class Agent:
         base_system_prompt: str | None = None,
     ) -> None:
         if args:
-            raise TypeError("Agent() takes no positional args beyond catalog/model; use keywords")
+            raise TypeError(
+                "Agent() takes no positional args beyond catalog/model; use keywords"
+            )
         self.catalog = catalog
         self.model = model
         self.tools = tools if tools is not None else []
@@ -124,7 +127,9 @@ class Agent:
         """Record an output result to feed the next invocation."""
         self._output_results.add(r)
 
-    def set_adispatch(self, fn: Callable[[str, dict[str, Any]], Awaitable[Any]]) -> None:
+    def set_adispatch(
+        self, fn: Callable[[str, dict[str, Any]], Awaitable[Any]]
+    ) -> None:
         """Wire the async unit-delivery callable (the hub dispatches
         output_unit frames and awaits the module's result frame)."""
         self.bridge.set_adispatch(fn)

@@ -5,6 +5,7 @@ tests and demos (mocked weather, in-process notifications, blob store,
 URL bookkeeping).  They are intentionally not part of the production
 package (``waycast.tools``), so production code carries no stubs.
 """
+
 from __future__ import annotations
 
 from typing import Any

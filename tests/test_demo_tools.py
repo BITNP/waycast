@@ -4,6 +4,7 @@ These tools moved out of the production package (``waycast.tools``) because
 they are mocked/demo stubs; they belong under tests so production code
 carries no placeholders.
 """
+
 from __future__ import annotations
 
 import demo_tools

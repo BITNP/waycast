@@ -6,6 +6,7 @@ are marked ``real_model`` and skipped unless explicitly requested with
 green while still making real-model coverage a first-class, opt-in target
 (AGENTS.md: no mocks, real models only).
 """
+
 from __future__ import annotations
 
 import pytest
@@ -23,7 +24,9 @@ def pytest_addoption(parser) -> None:
 def pytest_collection_modifyitems(config, items) -> None:
     if config.getoption("--run-real-model"):
         return
-    skip_real = pytest.mark.skip(reason="requires network + real model; pass --run-real-model")
+    skip_real = pytest.mark.skip(
+        reason="requires network + real model; pass --run-real-model"
+    )
     for item in items:
         if "real_model" in item.keywords:
             item.add_marker(skip_real)

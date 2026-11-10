@@ -30,7 +30,10 @@ CAPABILITY = {
     "output": {
         "schema": {
             "type": "object",
-            "properties": {"message": {"type": "string"}, "severity": {"type": "string"}},
+            "properties": {
+                "message": {"type": "string"},
+                "severity": {"type": "string"},
+            },
             "required": ["message"],
             "additionalProperties": False,
         },
@@ -38,12 +41,20 @@ CAPABILITY = {
     },
 }
 
-async with connect_module(hub_url="ws://127.0.0.1:8000", token="your-hub-token", capability=CAPABILITY) as ws:
+async with connect_module(
+    hub_url="ws://127.0.0.1:8000", token="your-hub-token", capability=CAPABILITY
+) as ws:
     async for raw in ws:
         frame = parse_frame(raw)
         if frame.type == "output_unit":
             # 真实派发逻辑（HTTP、队列、回调等）
-            await ws.send(make_frame("result", "alert", {"module": "alert", "status": "ok", "detail": "sent"}).model_dump_json())
+            await ws.send(
+                make_frame(
+                    "result",
+                    "alert",
+                    {"module": "alert", "status": "ok", "detail": "sent"},
+                ).model_dump_json()
+            )
 ```
 
 关键点：

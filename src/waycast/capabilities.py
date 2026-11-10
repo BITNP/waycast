@@ -10,6 +10,7 @@ A module connection may carry input and/or output capability over the same
 multiplexed connection (A25).  Status query is optional (A19): a module that
 does not advertise ``status.enabled`` gets no status tool.
 """
+
 from __future__ import annotations
 
 import json
@@ -39,7 +40,9 @@ class ModuleEndpoint:
     connection: Any = None
 
     @classmethod
-    def from_capability(cls, cap: Capability, connection: Any = None) -> "ModuleEndpoint":
+    def from_capability(
+        cls, cap: Capability, connection: Any = None
+    ) -> "ModuleEndpoint":
         return cls(
             name=cap.name,
             kind=cap.kind,
@@ -123,7 +126,9 @@ class CapabilityCatalog:
         """
 
         return [
-            self._modules[n] for n in sorted(self._modules) if self._modules[n].status_enabled
+            self._modules[n]
+            for n in sorted(self._modules)
+            if self._modules[n].status_enabled
         ]
 
     def describe_output_modules(self) -> str:

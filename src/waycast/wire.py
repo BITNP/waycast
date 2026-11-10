@@ -13,6 +13,7 @@ Module connection (ADR-0008).  ``waycast.protocols`` owns the payload models
 (UnifiedInput / OutputUnit / OutputResult); this module wraps them in the
 envelope and validates capability advertisements.
 """
+
 from __future__ import annotations
 
 from typing import Any, Literal

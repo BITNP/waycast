@@ -11,6 +11,7 @@ runs wait for the invocation after it.  Each result therefore appears once
 in the conversation history and ages out through summarization - never a
 re-rendered cumulative snapshot (that was the bug fixed by ADR-0013).
 """
+
 from __future__ import annotations
 from collections import Counter
 from pydantic import BaseModel, Field

@@ -10,6 +10,7 @@ and consistent with ADR-0002 / ADR-0007.
 The file is read as-is: no TOML, no escaping.  Every line you write is part
 of the prompt, so multi-paragraph instructions are natural to express.
 """
+
 from __future__ import annotations
 
 import os

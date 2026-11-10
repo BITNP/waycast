@@ -25,6 +25,7 @@ The bridge keeps the two tracks separate (A14): structured-output unit
 dispatch stays the primary path, and tools (status query, real data tools)
 remain a secondary tool-calling track.
 """
+
 from __future__ import annotations
 
 import json
@@ -71,12 +72,12 @@ class CapabilityBridge(AgentMiddleware):
         self.catalog = catalog
         self.user_system_prompt = user_system_prompt
         self.default_rules = default_rules
-        self._adispatch: Callable[
-            [str, dict[str, Any]], Awaitable[OutputResult]
-        ] | None = None
-        self._status_query: (
-            Callable[[str], Awaitable[dict[str, Any] | None]] | None
+        self._adispatch: (
+            Callable[[str, dict[str, Any]], Awaitable[OutputResult]] | None
         ) = None
+        self._status_query: Callable[[str], Awaitable[dict[str, Any] | None]] | None = (
+            None
+        )
         self._status_tool_impls: dict[str, Callable[[], Awaitable[str]]] = {}
 
     # -- wiring ----------------------------------------------------------
@@ -176,7 +177,9 @@ class CapabilityBridge(AgentMiddleware):
         if response.structured_response is not None:
             LOGGER.debug(
                 "llm response structured: %s",
-                json.dumps(response.structured_response, ensure_ascii=False, default=str),
+                json.dumps(
+                    response.structured_response, ensure_ascii=False, default=str
+                ),
             )
 
     # -- runtime status tools (A15/A19) ----------------------------------

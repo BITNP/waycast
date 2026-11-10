@@ -1,4 +1,5 @@
 """Wire protocol: capability advertisement, frame envelope, schema."""
+
 from __future__ import annotations
 
 import pytest
@@ -45,13 +46,17 @@ def test_parse_roundtrip():
 
 
 def test_parse_from_dict():
-    parsed = parse_frame({"protocol_version": 1, "type": "input", "module": "m", "payload": {}})
+    parsed = parse_frame(
+        {"protocol_version": 1, "type": "input", "module": "m", "payload": {}}
+    )
     assert parsed.type == "input"
 
 
 def test_parse_rejects_wrong_protocol_version():
     with pytest.raises(WaycastError):
-        parse_frame({"protocol_version": 999, "type": "input", "module": "m", "payload": {}})
+        parse_frame(
+            {"protocol_version": 999, "type": "input", "module": "m", "payload": {}}
+        )
 
 
 def test_parse_rejects_bad_json():
@@ -61,16 +66,25 @@ def test_parse_rejects_bad_json():
 
 def test_parse_rejects_unknown_type():
     with pytest.raises(WaycastError):
-        parse_frame({"protocol_version": 1, "type": "teleport", "module": "m", "payload": {}})
+        parse_frame(
+            {"protocol_version": 1, "type": "teleport", "module": "m", "payload": {}}
+        )
 
 
 def test_capability_requires_kind_consistency():
     with pytest.raises(Exception):
-        Capability.model_validate({"name": "m", "kind": "input"})  # kind=input needs input cap
+        Capability.model_validate(
+            {"name": "m", "kind": "input"}
+        )  # kind=input needs input cap
     with pytest.raises(Exception):
         # kind=input must not carry output cap
         Capability.model_validate(
-            {"name": "m", "kind": "input", "input": {"description": "d"}, "output": {"schema": {}, "description": "d"}}
+            {
+                "name": "m",
+                "kind": "input",
+                "input": {"description": "d"},
+                "output": {"schema": {}, "description": "d"},
+            }
         )
 
 

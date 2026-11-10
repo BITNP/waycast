@@ -5,6 +5,7 @@ test-only placeholder tools (weather lookups against mock data, in-process
 notification blobs, URL bookkeeping, ...) live in ``tests/demo_tools.py`` so
 production code stays free of stubs (see AGENTS.md: no placeholders).
 """
+
 from __future__ import annotations
 
 import time

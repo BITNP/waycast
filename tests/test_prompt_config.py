@@ -1,4 +1,5 @@
 """User-customizable Agent system prompt (plain-text file) tests."""
+
 from __future__ import annotations
 
 from waycast.prompt_config import (
@@ -59,7 +60,9 @@ def test_catalog_and_rules_after_user_prompt():
 
 
 def test_empty_parts_are_dropped():
-    prompt = build_system_prompt_with_user(None, base="", catalog="", status="", rules="")
+    prompt = build_system_prompt_with_user(
+        None, base="", catalog="", status="", rules=""
+    )
     assert prompt == ""
 
 

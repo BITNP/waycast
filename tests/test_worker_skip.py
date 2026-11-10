@@ -7,6 +7,7 @@ harness records whether the agent's ainvoke entry point is reached; it never
 stands in for model *behavior*.  Model behavior stays covered by the
 real-model smokes in test_agent_real.py.
 """
+
 from __future__ import annotations
 
 import asyncio

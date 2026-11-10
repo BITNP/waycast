@@ -6,6 +6,7 @@ human message, and the system prompt never carries it).  Composition is
 route-layer and stays offline per AGENTS.md; the end-to-end "model sees the
 failure" loop stays covered by the real-model smoke in test_agent_real.py.
 """
+
 from __future__ import annotations
 
 from waycast.bridge import CapabilityBridge
@@ -22,7 +23,11 @@ def test_results_as_text_renders_and_aggregates():
     assert results_as_text([]) == ""
     results = (
         [OutputResult(module="presenter", status="ok", detail="queued")] * 26
-        + [OutputResult(module="presenter", status="error", detail="'nod' is not valid")]
+        + [
+            OutputResult(
+                module="presenter", status="error", detail="'nod' is not valid"
+            )
+        ]
         + [OutputResult(module="presenter", status="ok", detail="queued")]
     )
     text = results_as_text(results)

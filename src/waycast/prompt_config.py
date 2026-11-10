@@ -9,6 +9,9 @@ and consistent with ADR-0002 / ADR-0007.
 
 The file is read as-is: no TOML, no escaping.  Every line you write is part
 of the prompt, so multi-paragraph instructions are natural to express.
+
+The repository ships ``waycast.prompt.txt.example`` as a starting template;
+the real ``waycast.prompt.txt`` is personal local config and is not tracked.
 """
 
 from __future__ import annotations

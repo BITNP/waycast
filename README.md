@@ -63,7 +63,7 @@ export WAYCAST_HUB_TOKEN=""                                       # 可选，模
 
 ### 自定义 Agent 系统提示词
 
-你可以直接写 **一整段纯文本** 作为 Agent 系统提示词的用户部分。默认读取项目根目录的 `waycast.prompt.txt`（可用环境变量 `WAYCAST_AGENT_CONFIG` 指定路径），文件内容原样读入，无需 TOML、转义或字段结构：
+你可以直接写 **一整段纯文本** 作为 Agent 系统提示词的用户部分。默认读取项目根目录的 `waycast.prompt.txt`（可用环境变量 `WAYCAST_AGENT_CONFIG` 指定路径），文件内容原样读入，无需 TOML、转义或字段结构。`waycast.prompt.txt` 是个人本地配置，不入库（已在 `.gitignore` 中）；从仓库自带的示例模板 [`waycast.prompt.txt.example`](waycast.prompt.txt.example) 复制一份开始修改即可。
 
 ```text
 你是一个调度助手。

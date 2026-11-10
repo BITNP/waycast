@@ -39,14 +39,17 @@ class WaycastConfig:
     # "agent invocation failed" 错误日志，worker 继续消费下一条输入。
     llm_timeout_seconds: float = 120.0
     llm_max_retries: int = 1
+    # LLM 思考档位（ChatOpenAI 原生标准参数 reasoning_effort，官方自
+    # langchain-openai>=1.4.1 提供，见
+    # docs.langchain.com/oss/python/langchain/models#reasoning，查阅 2026-11-11）。
+    # 实测 maas.bit.edu.cn deepseek-v4-flash 默认开思考（reasoning_tokens 计入
+    # 每次响应），置 "none" 后 reasoning_tokens=0（2026-11-10/11 实测，
+    # 与 extra_body 透传等效）。空 = 不设置、请求中不发该字段。
+    llm_reasoning_effort: str = ""
     # 逐请求透传给 OpenAI 兼容端的额外 JSON 字段（ChatOpenAI 官方一等字段，
-    # docstring 明示为 provider 专属参数的推荐传法，2026-11-11 查阅
-    # reference.langchain.com）。实测 maas.bit.edu.cn deepseek-v4-flash 默认开
-    # 思考（reasoning_tokens 计入每次响应），置
-    # {"reasoning_effort": "none"} 后 reasoning_tokens=0（2026-11-10 实测；
-    # none 为该端点方言值，非 OpenAI 标准档位，故不走原生 reasoning_effort
-    # 标准参数而是透传，保持核心对 provider 字节级透明）。
-    # 空 dict = 不发任何额外字段。
+    # docstring 明示为 provider 专属/方言参数的推荐传法，2026-11-11 查阅
+    # reference.langchain.com）。思考档位优先用上面的标准参数，勿在
+    # extra_body 里重复设置同名字段。空 dict = 不发任何额外字段。
     llm_extra_body: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -67,6 +70,7 @@ class WaycastConfig:
             llm_max_retries=int(
                 os.getenv("WAYCAST_LLM_MAX_RETRIES", str(cls.llm_max_retries))
             ),
+            llm_reasoning_effort=os.getenv("WAYCAST_LLM_REASONING_EFFORT", ""),
             llm_extra_body=_parse_extra_body(os.getenv("WAYCAST_LLM_EXTRA_BODY", "")),
         )
 
@@ -83,7 +87,7 @@ def _parse_extra_body(raw: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise TypeError(
             "WAYCAST_LLM_EXTRA_BODY must be a JSON object, e.g."
-            ' {"reasoning_effort": "none"}'
+            ' {"some_provider_flag": true}'
         )
     return cast("dict[str, Any]", parsed)
 
@@ -109,9 +113,15 @@ def make_model(
     themselves (e.g. tests that close their client per scenario) should pass
     their own client so closing it does not poison the shared cache.
 
+    ``llm_reasoning_effort`` (if set) is forwarded as the native
+    ``reasoning_effort`` standard ChatOpenAI parameter (official since
+    langchain-openai 1.4.1); it takes priority over a same-named key in
+    ``llm_extra_body``, which is stripped in that case so the request never
+    carries the field twice.
+
     ``llm_extra_body`` (if non-empty) is forwarded as ``extra_body`` so every
-    request carries provider-specific fields verbatim (e.g. disabling a
-    provider-default thinking mode).
+    request carries provider-specific fields verbatim (e.g. a provider-dialect
+    toggle that is not part of the standard OpenAI API).
     """
     from langchain_openai import ChatOpenAI
     from pydantic import SecretStr
@@ -121,13 +131,20 @@ def make_model(
             "Missing OpenAI credentials: set WAYCAST_BASE_URL and WAYCAST_API_KEY"
             " (or OPENAI_BASE_URL / OPENAI_API_KEY)."
         )
+    reasoning_effort = config.llm_reasoning_effort or None
+    extra_body = dict(config.llm_extra_body)
+    if reasoning_effort is not None:
+        # The standard parameter wins; drop any dialect duplicate so the
+        # request carries reasoning_effort exactly once.
+        extra_body.pop("reasoning_effort", None)
     return ChatOpenAI(
         base_url=config.base_url,
         api_key=SecretStr(config.api_key),
         model=config.model_name,
         timeout=config.llm_timeout_seconds,
         max_retries=config.llm_max_retries,
-        extra_body=config.llm_extra_body or None,
+        reasoning_effort=reasoning_effort,
+        extra_body=extra_body or None,
         http_async_client=http_async_client,
     )
 

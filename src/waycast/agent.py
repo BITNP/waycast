@@ -5,28 +5,26 @@ multi-round tool calling.  It does not hold a registry of in-process module
 objects: modules are connected over the network (ADR-0008) and their
 capabilities live in a CapabilityCatalog.  The CapabilityBridge middleware
 rebuilds the system prompt every invocation from the live catalog (A20),
-exposes per-module status tools (A15/A19), and routes output units through
-the hub to the owning module connections.  Output results accumulate into
-the next invocation (ADR-0002).
+exposes per-module status tools (A15/A19), and injects the one-shot
+output-results feed transiently into that prompt, never into checkpointed
+history (ADR-0002 / ADR-0013).  Output units are routed through the hub to
+the owning module connections.
 """
 from __future__ import annotations
 
-from typing import Annotated, Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 from langchain.agents import create_agent
-from langchain.agents.middleware.types import AgentState
-from langchain.messages import SystemMessage
+from langchain.agents.middleware import SummarizationMiddleware
+from langchain.messages import HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
-from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
-from waycast.blocks import results_as_message
 from waycast.bridge import CapabilityBridge, DEFAULT_RULES
 from waycast.capabilities import CapabilityCatalog
 from waycast.protocols import OutputUnit, UnifiedInput
 from waycast.state import OutputResult, OutputResultState
-from typing_extensions import NotRequired, Required
 
 
 class AgentOutput(BaseModel):
@@ -39,12 +37,13 @@ class AgentOutput(BaseModel):
     units: list[OutputUnit] = Field(default_factory=list)
 
 
-class WaycastAgentState(AgentState[AgentOutput]):
-    """AgentState extended with the global output-results feed."""
-
-    messages: Required[Annotated[list, add_messages]]
-    structured_response: NotRequired[AgentOutput]
-    output_results: NotRequired[dict[str, Any]]
+# History control is the built-in SummarizationMiddleware's job (official
+# LangChain wheel, no hand-rolled trimming): it compresses the global
+# single-thread history (ADR-0005) when either bound is hit.  The token
+# counter is approximate, so a message-count bound guards CJK-heavy chats
+# where characters-per-token underestimates.
+SUMMARIZE_TRIGGER = [("tokens", 60_000), ("messages", 240)]
+SUMMARIZE_KEEP = ("messages", 40)
 
 
 def _make_checkpointer() -> InMemorySaver:
@@ -102,9 +101,15 @@ class Agent:
             model=model,
             tools=self.tools,
             system_prompt=base,
-            middleware=[self.bridge],
+            middleware=[
+                self.bridge,
+                SummarizationMiddleware(
+                    model=model,
+                    trigger=SUMMARIZE_TRIGGER,
+                    keep=SUMMARIZE_KEEP,
+                ),
+            ],
             response_format=AgentOutput,
-            state_schema=WaycastAgentState,
             checkpointer=self.checkpointer,
         )
 
@@ -129,12 +134,14 @@ class Agent:
         self.bridge.set_status_query(fn)
 
     def _prepare(self, inp: UnifiedInput) -> dict[str, Any]:
-        """Build the graph input for one invocation."""
-        messages = [SystemMessage(content=inp.content)]
-        pending = results_as_message(self._output_results)
-        if pending is not None:
-            messages.append(pending)
-        return {"messages": messages, "output_results": self._output_results.model_dump()}
+        """Build the graph input for one invocation.
+
+        The unified input enters the conversation as a human message (the
+        LangChain conversation convention); the pending output-results feed
+        is NOT a message - the bridge injects it into the system prompt
+        transiently (ADR-0013).
+        """
+        return {"messages": [HumanMessage(content=inp.content)]}
 
     def _normalize_units(self, structured: Any) -> list[OutputUnit]:
         if structured is None:
@@ -160,7 +167,15 @@ class Agent:
         return result
 
     async def ainvoke(self, inp: UnifiedInput) -> InvocationResult:
-        """Run one invocation asynchronously (non-blocking)."""
+        """Run one invocation asynchronously (non-blocking).
+
+        Starts by draining the pending output-results feed and handing the
+        snapshot to the bridge: every result reaches exactly the next
+        invocation, through the dynamic system prompt, and never enters
+        checkpointed history (ADR-0002 / ADR-0013).  Results arriving while
+        this invocation runs wait for the next one.
+        """
+        self.bridge.begin_invocation(self._output_results.drain())
         state = await self.langchain_agent.ainvoke(
             self._prepare(inp),
             config=self._config(),
@@ -174,5 +189,4 @@ __all__ = [
     "BASE_SYSTEM_PROMPT",
     "DEFAULT_RULES",
     "InvocationResult",
-    "WaycastAgentState",
 ]

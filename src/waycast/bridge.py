@@ -5,8 +5,12 @@ This is the middleware through which the Agent sees and reaches modules
 
 - On every invocation it rebuilds the dynamic system prompt from
   ``[base prompt] + [user prompt] + [current capability catalog] +
-  [default rules]`` (A20), so module joins/leaves are reflected
-  immediately without rebuilding the agent graph.
+  [status tools] + [pending output results] + [default rules]`` (A20), so
+  module joins/leaves are reflected immediately without rebuilding the
+  agent graph.  The pending output-results feed is handed over once per
+  invocation via ``begin_invocation`` and injected transiently into the
+  system prompt, never into checkpointed message history (ADR-0002 /
+  ADR-0013).
 - It exposes a per-module ``status_<module>`` tool for modules that opt in
   to status querying (A15/A19).  The tool is a plain LangChain tool whose
   implementation sends a status_query frame on the module's connection and
@@ -40,7 +44,7 @@ from langchain_core.tools import tool
 
 from waycast.capabilities import CapabilityCatalog, ModuleEndpoint
 from waycast.prompt_config import build_system_prompt_with_user
-from waycast.state import OutputResult
+from waycast.state import OutputResult, results_as_text
 
 LOGGER = logging.getLogger(__name__)
 
@@ -75,8 +79,20 @@ class CapabilityBridge(AgentMiddleware):
             Callable[[str], Awaitable[dict[str, Any] | None]] | None
         ) = None
         self._status_tool_impls: dict[str, Callable[[], Awaitable[str]]] = {}
+        self._invocation_results: list[OutputResult] = []
 
     # -- wiring ----------------------------------------------------------
+
+    def begin_invocation(self, results: list[OutputResult]) -> None:
+        """Hand this invocation its one-shot output-results feed (ADR-0013).
+
+        The Agent drains its pending ``OutputResultState`` before running the
+        graph and passes the snapshot here; ``wrap_model_call`` renders it
+        into the dynamic system prompt, so the model sees each result exactly
+        once and nothing lands in checkpointed message history (ADR-0002).
+        """
+
+        self._invocation_results = list(results)
 
     def set_adispatch(
         self, adispatch: Callable[[str, dict[str, Any]], Awaitable[OutputResult]]
@@ -95,13 +111,14 @@ class CapabilityBridge(AgentMiddleware):
     # -- prompt assembly (A20) -------------------------------------------
 
     def _build_prompt(self, base: str = "") -> str:
-        """Assemble [base] + [user] + [catalog] + [status] + [rules]."""
+        """Assemble [base] + [user] + [catalog] + [status] + [feed] + [rules]."""
 
         return build_system_prompt_with_user(
             self.user_system_prompt,
             base=base,
             catalog=self.catalog.describe_output_modules(),
             status=self.catalog.describe_status_tools(),
+            feed=results_as_text(self._invocation_results),
             rules=self.default_rules,
         )
 

@@ -40,16 +40,19 @@ def build_system_prompt_with_user(
     base: str = "",
     catalog: str = "",
     status: str = "",
+    feed: str = "",
     rules: str = "",
 ) -> str:
     """Build the full system prompt: user instructions (if any), the
-    auto-generated catalog, the status-tool list, and the default rules.
+    auto-generated catalog, the status-tool list, the pending output-results
+    feed (ADR-0013), and the default rules.
 
     The order is always base first, then the user prompt, then catalog, then
-    status tools, then rules, so the fixed base stays authoritative and the
-    rules stay at the bottom.  Empty parts are dropped.
+    status tools, then the output-results feed, then rules, so the fixed base
+    stays authoritative and the rules stay at the bottom.  Empty parts are
+    dropped.
     """
-    parts = [p for p in (base, user_prompt, catalog, status, rules) if p]
+    parts = [p for p in (base, user_prompt, catalog, status, feed, rules) if p]
     return "\n\n".join(parts)
 
 

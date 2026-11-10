@@ -28,7 +28,7 @@ One element of an Agent's output list: a JSON object that satisfies one register
 _Avoid_: message, event, action
 
 **Output result**:
-The immediate value an output module returns after accepting a unit: success/failure status or textual detail. The result is carried into the state of the next invocation.
+The immediate value an output module returns after accepting a unit: success/failure status or textual detail. The result is delivered to the next invocation exactly once, injected transiently into the dynamic system prompt (ADR-0002, ADR-0013).
 _Avoid_: ack, callback result, response
 
 **Tool**:

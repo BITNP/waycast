@@ -1,12 +1,16 @@
 """Agent state: output results, memory hops, and the unified state carrier.
 The user chose global single-state memory (ADR-0005): there is no session or
 per-source isolation; every invocation appends to one shared conversation
-history and one shared feed of output results, because inputs are processed
+history and shares one feed of output results, because inputs are processed
 one at a time by a single consumer.
+
+The output-results feed is one-shot: each invocation drains the feed at its
+start and carries the drained results into its prompt exactly once
+(ADR-0002 / ADR-0013); results arriving while an invocation runs wait for the
+invocation after it.  The feed never enters checkpointed message history.
 """
 from __future__ import annotations
-from dataclasses import dataclass, field
-from typing import Any
+from collections import Counter
 from pydantic import BaseModel, Field
 
 
@@ -14,7 +18,7 @@ class OutputResult(BaseModel):
     """The immediate value an output module returns after accepting a unit.
 
     status is one of "ok" | "error"; detail carries a textual summary.
-    This result is carried into the state of the next invocation.
+    The result is delivered to the next invocation's prompt exactly once.
     """
 
     module: str
@@ -27,19 +31,37 @@ class OutputResult(BaseModel):
 
 
 class OutputResultState(BaseModel):
-    """Cumulative, global collection of output results fed to the next invocation."""
+    """Feed of output results waiting to be delivered to the next invocation."""
 
     results: list[OutputResult] = Field(default_factory=list)
 
     def add(self, r: OutputResult) -> None:
         self.results.append(r)
 
-    def as_memory_text(self) -> str:
-        """Render the pending results as prose for the Agent prompt."""
-        if not self.results:
-            return ""
-        lines = ["Output module results from previous deliveries:"]
-        for r in self.results:
-            lines.append(f"- {r.module}: {r.status} {r.detail}".strip())
-        return "\n".join(lines)
+    def drain(self) -> list[OutputResult]:
+        """Take everything pending; the feed is empty until new results land."""
+        drained = self.results
+        self.results = []
+        return drained
 
+
+def results_as_text(results: list[OutputResult]) -> str:
+    """Render pending output results as prose for the Agent prompt.
+
+    Identical results collapse into a single counted line so routine
+    acknowledgements (e.g. "ok queued" x 26) stay one line (ADR-0013);
+    errors keep their full verbatim detail.
+    """
+    if not results:
+        return ""
+    counts: Counter[tuple[str, str, str]] = Counter(
+        (r.module, r.status, r.detail) for r in results
+    )
+    lines = ["Output module results from previous deliveries:"]
+    for (module, status, detail), n in counts.items():
+        line = f"- {module}: {status} {detail}".strip()
+        lines.append(f"{line} (x{n})" if n > 1 else line)
+    return "\n".join(lines)
+
+
+__all__ = ["OutputResult", "OutputResultState", "results_as_text"]

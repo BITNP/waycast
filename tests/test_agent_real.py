@@ -189,8 +189,19 @@ def test_real_model_output_results_feed_next_invocation():
                 ),
                 timeout=120,
             )
-            # the pending feed survives even on an empty-output invocation
-            assert len(agent.pending_output_results.results) >= 1
+            # one-shot consumption (ADR-0002 / ADR-0013): invocation 2 drained
+            # the failed delivery into its system prompt, so nothing is
+            # pending afterwards
+            assert agent.pending_output_results.results == []
+            # and this invocation delivered an empty feed of its own
+            r3 = await asyncio.wait_for(
+                agent.ainvoke(
+                    UnifiedInput(content="Nothing else to do; output empty units.", source="cli")
+                ),
+                timeout=120,
+            )
+            assert r3.units == []
+            assert agent.pending_output_results.results == []
         finally:
             await client.aclose()
 

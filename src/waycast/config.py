@@ -40,8 +40,10 @@ class WaycastConfig:
     llm_timeout_seconds: float = 120.0
     llm_max_retries: int = 1
     # 逐请求透传给 OpenAI 兼容端的额外 JSON 字段（openai SDK extra_body），
-    # 用于 provider 专属开关，如关闭服务端默认开启的思考模式：
-    # {"thinking": {"type": "disabled"}}。空 dict = 不发任何额外字段。
+    # 用于 provider 专属开关。实测 maas.bit.edu.cn deepseek-v4-flash 默认开
+    # 思考（reasoning_tokens 计入每次响应），置
+    # {"reasoning_effort": "none"} 后 reasoning_tokens=0（2026-11-10 实测）。
+    # 空 dict = 不发任何额外字段。
     llm_extra_body: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -78,7 +80,7 @@ def _parse_extra_body(raw: str) -> dict[str, Any]:
     if not isinstance(parsed, dict):
         raise TypeError(
             "WAYCAST_LLM_EXTRA_BODY must be a JSON object, e.g."
-            ' {"thinking": {"type": "disabled"}}'
+            ' {"reasoning_effort": "none"}'
         )
     return cast("dict[str, Any]", parsed)
 

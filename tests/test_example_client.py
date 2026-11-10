@@ -10,34 +10,35 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from typing import Any
 
 import pytest
-
 from waycast_examples.client import connect_module
+
 from waycast.wire import parse_frame
 
 
 class FakeWS:
-    """In-memory websocket capturing what the client sends (httpx2 session API)."""
+    """In-memory websocket capturing what the client sends."""
 
     def __init__(self) -> None:
         self.sent: list[str] = []
         self._acks: asyncio.Queue[str] = asyncio.Queue()
 
-    async def send_text(self, data: str) -> None:
+    async def send(self, data: str) -> None:
         self.sent.append(data)
 
-    async def receive_text(self) -> str:
+    async def recv(self) -> str:
         return await asyncio.wait_for(self._acks.get(), timeout=5.0)
 
 
-def _fake_open(ws: FakeWS, captured: dict[str, str]):
-    """Patched client._open_ws: record the URI, yield the fake ws."""
+def _fake_connect(ws: FakeWS, captured: dict[str, str]):
+    """Patched websockets.connect: record the URI, yield the fake ws."""
     import json
     from contextlib import asynccontextmanager
 
     @asynccontextmanager
-    async def factory(uri: str):
+    async def factory(uri: str, **kwargs: Any):
         captured["uri"] = uri
         # the hub's accept ack frame
         await ws._acks.put(
@@ -56,11 +57,11 @@ def _fake_open(ws: FakeWS, captured: dict[str, str]):
 
 
 def test_connect_module_handshake_and_token_query(monkeypatch):
-    import waycast_examples.client as client
+    from waycast_examples import client
 
     ws = FakeWS()
     captured: dict[str, str] = {}
-    monkeypatch.setattr(client, "_open_ws", _fake_open(ws, captured))
+    monkeypatch.setattr(client.websockets, "connect", _fake_connect(ws, captured))
 
     capability = {
         "name": "alert",
@@ -87,11 +88,11 @@ def test_connect_module_handshake_and_token_query(monkeypatch):
 
 
 def test_connect_module_no_token_query(monkeypatch):
-    import waycast_examples.client as client
+    from waycast_examples import client
 
     ws = FakeWS()
     captured: dict[str, str] = {}
-    monkeypatch.setattr(client, "_open_ws", _fake_open(ws, captured))
+    monkeypatch.setattr(client.websockets, "connect", _fake_connect(ws, captured))
 
     async def scenario():
         async with connect_module(
@@ -112,12 +113,12 @@ def test_connect_module_no_token_query(monkeypatch):
 def test_connect_module_rejects_bad_ack(monkeypatch):
     import json
 
-    import waycast_examples.client as client
+    from waycast_examples import client
 
     ws = FakeWS()
 
     @asynccontextmanager
-    async def factory(uri: str):
+    async def factory(uri: str, **kwargs: Any):
         await ws._acks.put(
             json.dumps(
                 {
@@ -130,7 +131,7 @@ def test_connect_module_rejects_bad_ack(monkeypatch):
         )
         yield ws
 
-    monkeypatch.setattr(client, "_open_ws", factory)
+    monkeypatch.setattr(client.websockets, "connect", factory)
 
     async def scenario():
         async with connect_module(

@@ -14,20 +14,14 @@ handling.
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any, AsyncIterator
-
-import httpx2
+from typing import Any
 from urllib.parse import urlencode, urlparse, urlunparse
 
+import websockets
+
 from waycast.wire import make_frame, parse_frame
-
-
-@asynccontextmanager
-async def _open_ws(uri: str) -> AsyncIterator[Any]:
-    """One hub connection: httpx2 client with an upgraded WebSocket session."""
-    async with httpx2.AsyncClient() as http, http.websocket(uri) as ws:
-        yield ws
 
 
 @asynccontextmanager
@@ -39,18 +33,17 @@ async def connect_module(
 ) -> AsyncIterator[Any]:
     """Connect to the hub and announce a capability.
 
-    Yields the open websocket (httpx2 WebSocketSession: send_text /
-    receive_text).  The caller is then free to send input, output_unit,
-    result, status_query / status_result frames.
+    Yields the open websocket.  The caller is then free to send input,
+    output_unit, result, status_query / status_result frames.
     """
     parts = urlparse(hub_url.rstrip("/") + "/ws/modules")
     query = urlencode({"token": token}) if token else parts.query
     uri = urlunparse(parts._replace(query=query))
-    async with _open_ws(uri) as ws:
-        await ws.send_text(
+    async with websockets.connect(uri) as ws:
+        await ws.send(
             make_frame("capability", capability["name"], capability).model_dump_json()
         )
-        ack = parse_frame(await ws.receive_text())
+        ack = parse_frame(await ws.recv())
         if ack.type != "capability" or not ack.payload.get("accepted"):
             raise RuntimeError(
                 "hub did not accept capability: " + ack.model_dump_json()

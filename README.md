@@ -113,3 +113,15 @@ hub 端口不是 8000 时用 `--hub ws://127.0.0.1:<port>` 指定；配了 `WAYC
 - 想**编写自己的输入/输出模块**（wire 协议、capability 握手、status 查询）：见 [DEVELOPMENT.md](DEVELOPMENT.md#编写自己的模块)。
 - 想理解**关键设计点**（单通道多路复用、背压、结构化输出回退等）：见 [DEVELOPMENT.md](DEVELOPMENT.md#关键设计点) 与 [docs/adr/](docs/adr/)。
 - 术语的唯一称呼见 [GLOSSARY.md](GLOSSARY.md)。
+
+## 命名来历
+
+**waycast（道枢）**——waycast 一名有两层来历。
+
+**其一是字面的双关**：way（路、道）× cast——投送、播送（broadcast 的词根）、铸模、群戏卡司。输入沿路而来，被核心铸成一次次的表现。
+
+**其二是向 Wayland 协议致敬**（ADR-0015 记录）。Wayland 是 Linux 桌面的显示协议，其核心洞见在官方文档里写得很干净：应用（client）自己渲染自己的 surface，「所需要的只是把画好的 surface 呈现出来、并在多个客户端之间接收与仲裁输入的一层」——这一层叫 **compositor**（Wayland Book, Introduction；wayland.freedesktop.org，二者查阅于 2026-11-10）。waycast 是同构的镜像：各模块像 Wayland 客户端一样只广告自己的 capability、只与中枢收发帧，从不直接对话；hub 像 compositor 一样只做两件事——**接收并在所有输入之间仲裁**（每个输入帧恰好一次 Invocation，话权归 Agent，ADR-0011），以及**把输出组成后呈现出去**。连命名形态都同构：Way+land 是「道之所栖」，Way+cast 是「道之所投」。
+
+**中文名「道枢」**出自《庄子·齐物论》：「彼是莫得其偶，谓之道枢。枢始得其环中，以应无穷。」——枢，门轴也，是 hub 的中文本字；「环中」是圆环的空心处，立于其中便可应对外界的无穷变化。这恰好是三件事的合一：hub 立于输入与输出的环心，应答无穷的请求；圆环是 **π**——树莓娘的「树莓」兼指树莓派 Raspberry Pi，无限不循环恰似一场不会自我重复的对话；而「道枢」二字逐字对译 waycast：道＝way，枢＝hub。
+
+命名族全谱（waycast 道枢 / aria 云和 / loom 机杼 / lumen 显影）见 [ADR-0015](docs/adr/0015-raspberrygirl-naming-family.md) 与 [GLOSSARY](GLOSSARY.md)「命名族」。

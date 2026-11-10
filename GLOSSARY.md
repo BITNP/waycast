@@ -103,16 +103,24 @@ Raspberry Girl (树莓娘) is a product built on Waycast: every input arrives as
 The product: a front-facing multimodal agent that interacts through voice, IM, danmaku, and a Live2D avatar. Built on Waycast as its core.
 _Avoid_: 看板娘, 树莓女孩, 树莓少女
 
+**道枢 (Dàoshū)**:
+The sanctioned Chinese name of Waycast itself (the core), from Zhuangzi: 道枢, "the pivot of the Way" — 得其环中、以应无穷, the hub of the ring that responds without end. The English name stays Waycast; environment keys stay `WAYCAST_*`. See ADR-0015 and README「命名来历」.
+_Avoid_: 道枢核心, 枢核, translating "Waycast" as 韦卡斯
+
+**命名族 (naming family)**:
+The poetic Chinese/English names of the Raspberry Girl repositories, fixed by ADR-0015: Waycast（道枢）core; 云和 / aria voice input (formerly raspberrygirl-voice-input); 机杼 / loom text input (formerly raspberrygirl-text-input); 显影 / lumen aggregate output module (formerly raspberrygirl-presenter). Module names on the wire, in CLI commands, Python packages and env prefixes follow the English name (aria / loom / lumen, `ARIA_` / `LOOM_` / `LUMEN_`). Old identifiers are deprecated for new designs.
+_Avoid_: voice-input, text-input, presenter (as current module names)
+
 **网协 (BIT Network Pioneers Association)**:
 The Beijing Institute of Technology student association that designed Raspberry Girl and owns her as its official mascot; "网协" is the only sanctioned short form.
 _Avoid_: 网络开拓者协会 (without school affiliation)
 
 **Aggregate output module (聚合输出模块)**:
-The single Waycast module that combines the Godot frontend (Live2D avatar, subtitle, emotion, motion) with TTS synthesis and playback, plus PPT display/flip. capability.kind = "both"; it receives output units and its only input frame back to the hub is queue_finished — the frontend is a pure display surface with no user-operable elements. See ADR-0010 and raspberrygirl-presenter ADR-0005.
+The single Waycast module that combines the Godot frontend (Live2D avatar, subtitle, emotion, motion) with TTS synthesis and playback, plus PPT display/flip. capability.kind = "both"; it receives output units and its only input frame back to the hub is queue_finished — the frontend is a pure display surface with no user-operable elements. See ADR-0010 and lumen ADR-0005.
 _Avoid_: separate TTS module, separate frontend module, PPT module
 
 **Frontend interaction (前端交互)**:
-An event produced by the user in the Godot frontend (click, request) that the aggregate output module sends back to the hub as an input frame, triggering a new Invocation. Obsolete for the current aggregate output module: it is display-only and emits no such frames (raspberrygirl-presenter ADR-0005); do not use this term for new designs.
+An event produced by the user in the Godot frontend (click, request) that the aggregate output module sends back to the hub as an input frame, triggering a new Invocation. Obsolete for the current aggregate output module: it is display-only and emits no such frames (lumen ADR-0005); do not use this term for new designs.
 _Avoid_: UI event, command
 
 **Final input (最终输入)**:

@@ -107,9 +107,9 @@ _Avoid_: 看板娘, 树莓女孩, 树莓少女
 The sanctioned Chinese name of Waycast itself (the core), from Zhuangzi: 道枢, "the pivot of the Way" — 得其环中、以应无穷, the hub of the ring that responds without end. The English name stays Waycast; environment keys stay `WAYCAST_*`. See ADR-0015 and README「命名来历」.
 _Avoid_: 道枢核心, 枢核, translating "Waycast" as 韦卡斯
 
-**命名族 (naming family)**:
-The poetic Chinese/English names of the Raspberry Girl repositories, fixed by ADR-0015: Waycast（道枢）core; 云和 / aria voice input (formerly raspberrygirl-voice-input); 机杼 / loom text input (formerly raspberrygirl-text-input); 显影 / lumen aggregate output module (formerly raspberrygirl-presenter). Module names on the wire, in CLI commands, Python packages and env prefixes follow the English name (aria / loom / lumen, `ARIA_` / `LOOM_` / `LUMEN_`). Old identifiers are deprecated for new designs.
-_Avoid_: voice-input, text-input, presenter (as current module names)
+**关联项目 (related projects)**:
+The Raspberry Girl system spans four multirepo microservice projects, each a separate repository named poetically (fixed by ADR-0015): Waycast（道枢）core; 云和 / aria voice input (formerly raspberrygirl-voice-input); 机杼 / loom text input (formerly raspberrygirl-text-input); 显影 / lumen aggregate output module (formerly raspberrygirl-presenter). Module names on the wire, in CLI commands, Python packages and env prefixes follow the English name (aria / loom / lumen, `ARIA_` / `LOOM_` / `LUMEN_`). Old identifiers are deprecated for new designs.
+_Avoid_: 命名族, naming family, voice-input, text-input, presenter (as current module names)
 
 **网协 (BIT Network Pioneers Association)**:
 The Beijing Institute of Technology student association that designed Raspberry Girl and owns her as its official mascot; "网协" is the only sanctioned short form.

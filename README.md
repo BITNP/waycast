@@ -1,6 +1,6 @@
 # 道枢（Waycast）· 树莓娘唯一核心
 
-> 命名族：[云和（Aria）](https://github.com/BITNP/aria) · [机杼（Loom）](https://github.com/BITNP/loom) · [显影（Lumen）](https://github.com/BITNP/lumen)
+> 关联项目：[云和（Aria）](https://github.com/BITNP/aria) · [机杼（Loom）](https://github.com/BITNP/loom) · [显影（Lumen）](https://github.com/BITNP/lumen)
 
 一个基于 LangChain v1 的微服务化 Agent：输入/输出模块是独立服务，通过 WebSocket 连接到 Agent（枢纽），以统一 JSON Wire 协议交换帧。每条输入触发一次 Agent 调用（Invocation）；Agent 通过多轮真实模型工具调用产出 JSON 输出单元列表（可为空），派发给已连接的输出模块连接（fire-and-forget）；每个派发立刻返回输出结果，该结果搭载在下一轮调用的输入消息开头、一次性进入对话历史（ADR-0002 / ADR-0014）。
 
@@ -126,7 +126,7 @@ hub 端口不是 8000 时用 `--hub ws://127.0.0.1:<port>` 指定；配了 `WAYC
 
 **中文名「道枢」**出自《庄子·齐物论》：「彼是莫得其偶，谓之道枢。枢始得其环中，以应无穷。」——枢，门轴也，是 hub 的中文本字；「环中」是圆环的空心处，立于其中便可应对外界的无穷变化。这恰好是三件事的合一：hub 立于输入与输出的环心，应答无穷的请求；圆环是 **π**——树莓娘的「树莓」兼指树莓派 Raspberry Pi，无限不循环恰似一场不会自我重复的对话；而「道枢」二字逐字对译 waycast：道＝way，枢＝hub。
 
-命名族全谱（waycast 道枢 / aria 云和 / loom 机杼 / lumen 显影）见 [ADR-0015](docs/adr/0015-raspberrygirl-naming-family.md) 与 [GLOSSARY](GLOSSARY.md)「命名族」。
+关联项目（waycast 道枢 / aria 云和 / loom 机杼 / lumen 显影，multirepo 微服务）的命名与映射见 [ADR-0015](docs/adr/0015-related-projects.md) 与 [GLOSSARY](GLOSSARY.md)「关联项目」。
 
 ## 许可证
 

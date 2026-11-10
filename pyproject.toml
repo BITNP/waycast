@@ -39,3 +39,5 @@ markers = [
     "real_model: runs against the real model configured in .env (network required)",
 ]
 
+# lint 规则集 = ruff 内置默认（四仓一致，不另选规则族；生效规则集由 uv.lock 钉死的 ruff 版本决定）。
+

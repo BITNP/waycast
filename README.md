@@ -1,4 +1,6 @@
-# Waycast
+# 道枢（Waycast）· 树莓娘唯一核心
+
+> 命名族：[云和（Aria）](https://github.com/BITNP/aria) · [机杼（Loom）](https://github.com/BITNP/loom) · [显影（Lumen）](https://github.com/BITNP/lumen)
 
 一个基于 LangChain v1 的微服务化 Agent：输入/输出模块是独立服务，通过 WebSocket 连接到 Agent（枢纽），以统一 JSON Wire 协议交换帧。每条输入触发一次 Agent 调用（Invocation）；Agent 通过多轮真实模型工具调用产出 JSON 输出单元列表（可为空），派发给已连接的输出模块连接（fire-and-forget）；每个派发立刻返回输出结果，该结果搭载在下一轮调用的输入消息开头、一次性进入对话历史（ADR-0002 / ADR-0014）。
 

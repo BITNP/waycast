@@ -11,7 +11,8 @@ real-model smokes in test_agent_real.py.
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any, ClassVar
 
 from waycast.capabilities import CapabilityCatalog
 from waycast.hub import Hub
@@ -43,7 +44,7 @@ class _HarnessAgent:
     @property
     def pending_output_results(self):
         class _State:
-            results: list[OutputResult] = []
+            results: ClassVar[list[OutputResult]] = []
 
         return _State()
 

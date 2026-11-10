@@ -4,15 +4,14 @@ model from environment or a .env file.
 
 from __future__ import annotations
 
+import contextlib
 import os
 from dataclasses import dataclass
 
-try:
+with contextlib.suppress(Exception):  # dotenv is optional at import time
     from dotenv import load_dotenv
 
     load_dotenv()
-except Exception:  # dotenv is optional at import time
-    pass
 
 
 @dataclass

@@ -11,12 +11,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import time
-from typing import Any
 
 from waycast.wire import make_frame
-
 from waycast_examples.client import connect_module
-
 
 CAPABILITY = {
     "name": "cron_source",

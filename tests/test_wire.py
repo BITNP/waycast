@@ -2,16 +2,13 @@
 
 from __future__ import annotations
 
+import pydantic
 import pytest
 
 from waycast.protocols import OutputUnit, UnifiedInput, WaycastError
 from waycast.wire import (
     PROTOCOL_VERSION,
     Capability,
-    InputCapability,
-    OutputCapability,
-    StatusCapability,
-    WireFrame,
     make_frame,
     parse_frame,
 )
@@ -72,11 +69,11 @@ def test_parse_rejects_unknown_type():
 
 
 def test_capability_requires_kind_consistency():
-    with pytest.raises(Exception):
+    with pytest.raises(pydantic.ValidationError):
         Capability.model_validate(
             {"name": "m", "kind": "input"}
         )  # kind=input needs input cap
-    with pytest.raises(Exception):
+    with pytest.raises(pydantic.ValidationError):
         # kind=input must not carry output cap
         Capability.model_validate(
             {

@@ -218,7 +218,7 @@ class CapabilityBridge(AgentMiddleware):
             return await handler(request)
         try:
             content = await impl()
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - 注册工具可抛任意异常，统一转成工具结果文本，不得击穿 agent 循环
             content = f"status query for {request.tool_call['name']!r} failed: {exc}"
         return ToolMessage(
             content=content,
@@ -237,4 +237,4 @@ class CapabilityBridge(AgentMiddleware):
         )
 
 
-__all__ = ["CapabilityBridge", "DEFAULT_RULES"]
+__all__ = ["DEFAULT_RULES", "CapabilityBridge"]

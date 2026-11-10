@@ -13,7 +13,8 @@ through the hub to the owning module connections.
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import SummarizationMiddleware
@@ -22,7 +23,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from pydantic import BaseModel, Field
 
-from waycast.bridge import CapabilityBridge, DEFAULT_RULES
+from waycast.bridge import DEFAULT_RULES, CapabilityBridge
 from waycast.capabilities import CapabilityCatalog
 from waycast.protocols import OutputUnit, UnifiedInput
 from waycast.state import OutputResult, OutputResultState, input_content_with_feed
@@ -193,9 +194,9 @@ class Agent:
 
 
 __all__ = [
-    "Agent",
-    "AgentOutput",
     "BASE_SYSTEM_PROMPT",
     "DEFAULT_RULES",
+    "Agent",
+    "AgentOutput",
     "InvocationResult",
 ]

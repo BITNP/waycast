@@ -22,13 +22,15 @@ The hub layer is transport-specific (WebSocket); the frame model in
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import uuid
-from typing import Any, Awaitable, Callable
+from collections.abc import Awaitable, Callable
+from typing import Any
 
-from fastapi import WebSocket, WebSocketDisconnect
 import jsonschema
+from fastapi import WebSocket, WebSocketDisconnect
 
 from waycast.capabilities import CapabilityCatalog
 from waycast.protocols import UnifiedInput, WaycastError
@@ -103,16 +105,12 @@ class Hub:
             pass
         except WaycastError as exc:
             log.warning("rejecting module connection: %s", exc)
-            try:
+            with contextlib.suppress(Exception):
                 await ws.close(code=4400, reason=str(exc))
-            except Exception:
-                pass
         except Exception as exc:  # never crash the accept task
             log.exception("module connection error")
-            try:
+            with contextlib.suppress(Exception):
                 await ws.close(code=4400, reason=f"error: {exc}")
-            except Exception:
-                pass
         finally:
             # Drop only if this connection is still the current one: a
             # reconnect replaces the entry, so an old task's finally must not
@@ -238,7 +236,7 @@ class Hub:
             )
         try:
             jsonschema.validate(payload, schema)
-        except Exception as exc:
+        except (jsonschema.ValidationError, jsonschema.SchemaError) as exc:
             return OutputResult(
                 module=module,
                 status="error",
@@ -248,7 +246,7 @@ class Hub:
             await conn.ws.send_text(
                 make_frame("output_unit", module, payload).model_dump_json()
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - 网络发送边界不穷举 uvicorn/starlette 各栈异常族，统一收敛为 error 结果上报
             log.warning("unit dispatch to %s failed: %s", module, exc)
             return OutputResult(
                 module=module,
@@ -282,17 +280,15 @@ class Hub:
                 ).model_dump_json()
             )
             return await asyncio.wait_for(fut, timeout=10.0)
-        except Exception:
+        except Exception:  # noqa: BLE001 - 尽力而为的状态查询：超时/断连/任何协议故障一律按不可达返回 None
             return None
         finally:
             self._status_futures.pop(request_id, None)
 
     async def close(self) -> None:
         for conn in list(self._connections.values()):
-            try:
+            with contextlib.suppress(Exception):  # 关闭尽力而为
                 await conn.ws.close()
-            except Exception:
-                pass
         self._connections.clear()
         for name in list(self.catalog.names()):
             self.catalog.remove(name)

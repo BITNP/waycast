@@ -9,9 +9,7 @@ Agent model behavior is covered by real-model smokes.
 from __future__ import annotations
 
 import asyncio
-import json
-
-import pytest
+import contextlib
 
 from waycast.capabilities import CapabilityCatalog
 from waycast.hub import Hub
@@ -83,7 +81,7 @@ def _make_env():
 
 
 def test_first_frame_must_be_capability():
-    hub, cat, received, results = _make_env()
+    hub, cat, _received, _results = _make_env()
 
     async def scenario():
         ws = PairWS()
@@ -95,18 +93,16 @@ def test_first_frame_must_be_capability():
             make_frame("input", "echo", {"content": "x"}).model_dump_json()
         )
         # hub should reject; the accept task should end
-        try:
-            await asyncio.wait_for(task, timeout=2.0)
+        with contextlib.suppress(Exception):
             # either it raised (WaycastError path closed) or ended
-        except Exception:
-            pass
+            await asyncio.wait_for(task, timeout=2.0)
         assert cat.names() == []
 
     run(scenario())
 
 
 def test_capability_and_input_enqueue():
-    hub, cat, received, results = _make_env()
+    hub, _cat, received, _results = _make_env()
 
     async def scenario():
         ws = PairWS()
@@ -140,7 +136,7 @@ def test_capability_and_input_enqueue():
 
 
 def test_bad_token_rejected():
-    hub, cat, received, results = _make_env()
+    hub, cat, _received, _results = _make_env()
 
     async def scenario():
         ws = PairWS()
@@ -154,7 +150,7 @@ def test_bad_token_rejected():
 
 
 def test_dispatch_validates_and_sends():
-    hub, cat, received, results = _make_env()
+    hub, _cat, _received, _results = _make_env()
 
     async def scenario():
         ws = PairWS()
@@ -179,7 +175,7 @@ def test_dispatch_validates_and_sends():
 
 
 def test_dispatch_rejects_bad_schema():
-    hub, cat, received, results = _make_env()
+    hub, _cat, _received, _results = _make_env()
 
     async def scenario():
         ws = PairWS()
@@ -201,7 +197,7 @@ def test_dispatch_rejects_bad_schema():
 
 
 def test_dispatch_unknown_module():
-    hub, cat, received, results = _make_env()
+    hub, _cat, _received, _results = _make_env()
 
     async def scenario():
         ws = PairWS()
@@ -223,7 +219,7 @@ def test_dispatch_unknown_module():
 
 
 def test_status_roundtrip():
-    hub, cat, received, results = _make_env()
+    hub, _cat, _received, _results = _make_env()
 
     async def scenario():
         ws = PairWS()
@@ -254,7 +250,7 @@ def test_status_roundtrip():
 
 
 def test_catalog_output_accumulates_result_frames():
-    hub, cat, received, results = _make_env()
+    hub, _cat, _received, results = _make_env()
 
     async def scenario():
         ws = PairWS()

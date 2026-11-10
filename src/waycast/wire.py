@@ -20,9 +20,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from waycast.protocols import OutputUnit, UnifiedInput
 from waycast.state import OutputResult  # noqa: F401  (payload models for frames)
-
 
 PROTOCOL_VERSION = 1
 
@@ -56,7 +54,7 @@ class WireFrame(BaseModel):
     payload: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _check_version(self) -> "WireFrame":
+    def _check_version(self) -> WireFrame:
         if self.protocol_version != PROTOCOL_VERSION:
             raise ValueError(
                 f"unsupported protocol_version {self.protocol_version}; "
@@ -112,7 +110,7 @@ class Capability(BaseModel):
     status: StatusCapability | None = None
 
     @model_validator(mode="after")
-    def _kind_matches_payloads(self) -> "Capability":
+    def _kind_matches_payloads(self) -> Capability:
         if self.kind in ("input", "both") and self.input is None:
             raise ValueError("kind declares input but no input capability given")
         if self.kind in ("output", "both") and self.output is None:

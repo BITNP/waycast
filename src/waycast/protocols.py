@@ -50,4 +50,4 @@ class WaycastError(RuntimeError):
     """Base error raised by the Waycast hub, service, or wire layer."""
 
 
-__all__ = ["UnifiedInput", "OutputUnit", "WaycastError"]
+__all__ = ["OutputUnit", "UnifiedInput", "WaycastError"]

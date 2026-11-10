@@ -29,13 +29,13 @@ load_dotenv(Path(os.getcwd()) / ".env")
 
 import httpx2
 
-from waycast.agent import Agent  # noqa: E402
-from waycast.capabilities import CapabilityCatalog  # noqa: E402
-from waycast.config import WaycastConfig, make_model  # noqa: E402
-from waycast.protocols import UnifiedInput  # noqa: E402
-from waycast.state import OutputResult  # noqa: E402
-from waycast.tools import default_tools  # noqa: E402
-from waycast.wire import Capability  # noqa: E402
+from waycast.agent import Agent
+from waycast.capabilities import CapabilityCatalog
+from waycast.config import WaycastConfig, make_model
+from waycast.protocols import UnifiedInput
+from waycast.state import OutputResult
+from waycast.tools import default_tools
+from waycast.wire import Capability
 
 
 def _cfg():
@@ -145,7 +145,7 @@ def test_real_model_status_tool_roundtrip():
                 return {"state": "up", "since": "boot"}
 
             agent.set_status_query(status_query)
-            res = await asyncio.wait_for(
+            await asyncio.wait_for(
                 agent.ainvoke(
                     UnifiedInput(
                         content=(
@@ -203,7 +203,7 @@ def test_real_model_output_results_feed_next_invocation():
             )
             assert r1.results and all(r2.status != "ok" for r2 in r1.results)
 
-            r2 = await asyncio.wait_for(
+            await asyncio.wait_for(
                 agent.ainvoke(
                     UnifiedInput(
                         content="Nothing else to do; output empty units.", source="cli"

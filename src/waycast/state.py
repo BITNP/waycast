@@ -13,7 +13,9 @@ re-rendered cumulative snapshot (that was the bug fixed by ADR-0013).
 """
 
 from __future__ import annotations
+
 from collections import Counter
+
 from pydantic import BaseModel, Field
 
 

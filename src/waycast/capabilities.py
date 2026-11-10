@@ -17,7 +17,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
-from waycast.wire import Capability, OutputCapability
+from waycast.wire import Capability
 
 
 @dataclass
@@ -40,9 +40,7 @@ class ModuleEndpoint:
     connection: Any = None
 
     @classmethod
-    def from_capability(
-        cls, cap: Capability, connection: Any = None
-    ) -> "ModuleEndpoint":
+    def from_capability(cls, cap: Capability, connection: Any = None) -> ModuleEndpoint:
         return cls(
             name=cap.name,
             kind=cap.kind,

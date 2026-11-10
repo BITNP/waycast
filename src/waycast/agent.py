@@ -4,11 +4,11 @@ The Agent builds a LangChain v1 create_agent with structured output and
 multi-round tool calling.  It does not hold a registry of in-process module
 objects: modules are connected over the network (ADR-0008) and their
 capabilities live in a CapabilityCatalog.  The CapabilityBridge middleware
-rebuilds the system prompt every invocation from the live catalog (A20),
-exposes per-module status tools (A15/A19), and injects the one-shot
-output-results feed transiently into that prompt, never into checkpointed
-history (ADR-0002 / ADR-0013).  Output units are routed through the hub to
-the owning module connections.
+rebuilds the system prompt every invocation from the live catalog (A20) and
+exposes per-module status tools (A15/A19).  The one-shot output-results
+feed rides at the head of the next invocation's human message, once, and
+ages out with the history (ADR-0002 / ADR-0014).  Output units are routed
+through the hub to the owning module connections.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field
 from waycast.bridge import CapabilityBridge, DEFAULT_RULES
 from waycast.capabilities import CapabilityCatalog
 from waycast.protocols import OutputUnit, UnifiedInput
-from waycast.state import OutputResult, OutputResultState
+from waycast.state import OutputResult, OutputResultState, input_content_with_feed
 
 
 class AgentOutput(BaseModel):
@@ -133,15 +133,20 @@ class Agent:
         """Wire the status-query callable (the hub sends status_query frames)."""
         self.bridge.set_status_query(fn)
 
-    def _prepare(self, inp: UnifiedInput) -> dict[str, Any]:
+    def _prepare(self, inp: UnifiedInput, feed: list[OutputResult]) -> dict[str, Any]:
         """Build the graph input for one invocation.
 
         The unified input enters the conversation as a human message (the
-        LangChain conversation convention); the pending output-results feed
-        is NOT a message - the bridge injects it into the system prompt
-        transiently (ADR-0013).
+        LangChain conversation convention) with the drained output-results
+        feed mounted at its head: the feed is conversational evidence of the
+        previous turn's deliveries, not an instruction, so it rides the user
+        turn, never the system prompt (ADR-0014).
         """
-        return {"messages": [HumanMessage(content=inp.content)]}
+        return {
+            "messages": [
+                HumanMessage(content=input_content_with_feed(feed, inp.content))
+            ]
+        }
 
     def _normalize_units(self, structured: Any) -> list[OutputUnit]:
         if structured is None:
@@ -169,15 +174,14 @@ class Agent:
     async def ainvoke(self, inp: UnifiedInput) -> InvocationResult:
         """Run one invocation asynchronously (non-blocking).
 
-        Starts by draining the pending output-results feed and handing the
-        snapshot to the bridge: every result reaches exactly the next
-        invocation, through the dynamic system prompt, and never enters
-        checkpointed history (ADR-0002 / ADR-0013).  Results arriving while
-        this invocation runs wait for the next one.
+        Starts by draining the pending output-results feed and mounting it
+        at the head of this invocation's human message: every result reaches
+        exactly the next invocation, exactly once (ADR-0002 / ADR-0014).
+        Results arriving while this invocation runs wait for the next one.
         """
-        self.bridge.begin_invocation(self._output_results.drain())
+        feed = self._output_results.drain()
         state = await self.langchain_agent.ainvoke(
-            self._prepare(inp),
+            self._prepare(inp, feed),
             config=self._config(),
         )
         return await self._afinish(state.get("structured_response"), inp)

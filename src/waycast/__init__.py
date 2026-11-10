@@ -5,8 +5,8 @@ multiplexed WebSocket per module (ADR-0008).  Inputs arrive as input frames;
 each input triggers one Agent invocation; the Agent runs a multi-round LLM
 tool-calling loop and emits a list of output units targeted at connected output
 modules, which accept them fire-and-forget and return an immediate output
-result that is delivered to the next invocation's prompt exactly once
-(ADR-0002 / ADR-0013).
+result that rides at the head of the next invocation's input message exactly
+once (ADR-0002 / ADR-0014).
 """
 
 from waycast.agent import (
@@ -26,7 +26,12 @@ from waycast.prompt_config import (
 )
 from waycast.protocols import OutputUnit, UnifiedInput, WaycastError
 from waycast.service import Service
-from waycast.state import OutputResult, OutputResultState, results_as_text
+from waycast.state import (
+    OutputResult,
+    OutputResultState,
+    input_content_with_feed,
+    results_as_text,
+)
 from waycast.wire import (
     PROTOCOL_VERSION,
     Capability,
@@ -50,7 +55,7 @@ __all__ = [
     "build_system_prompt_with_user", "read_user_system_prompt",
     "OutputUnit", "UnifiedInput", "WaycastError",
     "Service",
-    "OutputResult", "OutputResultState", "results_as_text",
+    "OutputResult", "OutputResultState", "input_content_with_feed", "results_as_text",
     "PROTOCOL_VERSION", "Capability", "InputCapability", "OutputCapability",
     "StatusCapability", "WireFrame", "make_frame", "parse_frame",
 ]

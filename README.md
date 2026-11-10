@@ -1,6 +1,6 @@
 # Waycast
 
-一个基于 LangChain v1 的微服务化 Agent：输入/输出模块是独立服务，通过 WebSocket 连接到 Agent（枢纽），以统一 JSON Wire 协议交换帧。每条输入触发一次 Agent 调用（Invocation）；Agent 通过多轮真实模型工具调用产出 JSON 输出单元列表（可为空），派发给已连接的输出模块连接（fire-and-forget）；每个派发立刻返回输出结果，该结果一次性进入下一轮调用的动态系统提示词（ADR-0002 / ADR-0013）。
+一个基于 LangChain v1 的微服务化 Agent：输入/输出模块是独立服务，通过 WebSocket 连接到 Agent（枢纽），以统一 JSON Wire 协议交换帧。每条输入触发一次 Agent 调用（Invocation）；Agent 通过多轮真实模型工具调用产出 JSON 输出单元列表（可为空），派发给已连接的输出模块连接（fire-and-forget）；每个派发立刻返回输出结果，该结果搭载在下一轮调用的输入消息开头、一次性进入对话历史（ADR-0002 / ADR-0014）。
 
 本文是**用户文档**：如何安装、配置并运行 Waycast 服务。架构细节、Wire 协议与模块编写、测试与代码结构见**开发者文档** [DEVELOPMENT.md](DEVELOPMENT.md)；术语见 [GLOSSARY.md](GLOSSARY.md)，架构决策见 [docs/adr/](docs/adr/)。
 
@@ -22,7 +22,7 @@ Waycast 的核心（`src/`）只含本体：协议、Agent、hub、service、wir
 - **Input module**：把外部信号转成统一 `UnifiedInput`（`content` + `source` + `metadata`）的独立服务，经 WebSocket 发送 `input` 帧；每条输入恰好触发一次 Invocation。
 - **Agent**：对每条输入运行一次多轮工具调用（内置真实工具 + 可接入 MCP 工具），产出结构化 JSON：`{ "units": [ { "module": "...", "payload": {...} }, ... ] }`，`units` 可为空。
 - **Output module**：连接时声明自己接受的 JSON Schema 与语义描述；收到 `output_unit` 帧后立即返回 `result` 帧（成功/失败）。Agent 在派发前按 schema 校验（ADR-0008）。
-- **闭环**：模块返回的 `result` 帧进入待送达 feed，恰好在下一轮 Invocation 开始时被一次性取出，作为动态系统提示词的一段临时注入（不进对话历史）（ADR-0002 / ADR-0013）。
+- **闭环**：模块返回的 `result` 帧进入待送达 feed，恰好在下一轮 Invocation 开始时被一次性取出，搭载在该轮输入 human 消息的开头进入对话历史（每条结果只出现一次，随摘要老化）（ADR-0002 / ADR-0014）。
 - **Global memory**：所有输入以 human 消息累积到同一条对话历史（固定 `thread_id` + `InMemorySaver`），单消费者逐条处理，无会话隔离（ADR-0005）；历史逼近阈值时由内置 `SummarizationMiddleware` 自动摘要压缩（ADR-0013）。
 
 ## 快速开始

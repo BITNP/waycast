@@ -5,9 +5,11 @@ history and shares one feed of output results, because inputs are processed
 one at a time by a single consumer.
 
 The output-results feed is one-shot: each invocation drains the feed at its
-start and carries the drained results into its prompt exactly once
-(ADR-0002 / ADR-0013); results arriving while an invocation runs wait for the
-invocation after it.  The feed never enters checkpointed message history.
+start and mounts the drained results at the head of its own human message
+exactly once (ADR-0002 / ADR-0014); results arriving while an invocation
+runs wait for the invocation after it.  Each result therefore appears once
+in the conversation history and ages out through summarization - never a
+re-rendered cumulative snapshot (that was the bug fixed by ADR-0013).
 """
 from __future__ import annotations
 from collections import Counter
@@ -18,7 +20,8 @@ class OutputResult(BaseModel):
     """The immediate value an output module returns after accepting a unit.
 
     status is one of "ok" | "error"; detail carries a textual summary.
-    The result is delivered to the next invocation's prompt exactly once.
+    The result is delivered to the next invocation exactly once, riding at
+    the head of that invocation's input message.
     """
 
     module: str
@@ -64,4 +67,20 @@ def results_as_text(results: list[OutputResult]) -> str:
     return "\n".join(lines)
 
 
-__all__ = ["OutputResult", "OutputResultState", "results_as_text"]
+def input_content_with_feed(results: list[OutputResult], content: str) -> str:
+    """Compose one invocation's human-message content.
+
+    The drained output-results feed rides at the head of the newest unified
+    input, separated by a blank line (ADR-0014); an empty feed leaves the
+    content untouched.
+    """
+    feed = results_as_text(results)
+    return f"{feed}\n\n{content}" if feed else content
+
+
+__all__ = [
+    "OutputResult",
+    "OutputResultState",
+    "input_content_with_feed",
+    "results_as_text",
+]

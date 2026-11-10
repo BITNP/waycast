@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Waycast 是一个长期运行的 Agent 服务：输入模块产生统一输入，每个输入触发一次 Agent 调用（Invocation），Agent 以多轮工具调用产出 JSON 输出单元列表（可为空），派发给任意输出模块组合（fire-and-forget），每个派发立刻返回输出结果，该结果恰好在下一轮调用被一次性消费——经 capability-bridge 临时注入动态系统提示词，不进对话历史（ADR-0013）。
+Waycast 是一个长期运行的 Agent 服务：输入模块产生统一输入，每个输入触发一次 Agent 调用（Invocation），Agent 以多轮工具调用产出 JSON 输出单元列表（可为空），派发给任意输出模块组合（fire-and-forget），每个派发立刻返回输出结果，该结果恰好在下一轮调用被一次性消费——搭载在下一轮 Unified input 的 human 消息开头进入对话历史（ADR-0014）。
 
 Waycast 也是树莓娘（Raspberry Girl）项目的唯一核心（ADR-0009）：树莓娘的语音、IM、弹幕输入作为 Waycast 输入模块；表情、动作、语音合成、PPT 显示与翻页由聚合输出模块承担（ADR-0010）；话权与打断由核心 Agent 自行决定（ADR-0011）；RAG 等核心增强在 Waycast 核心内实现（ADR-0012）。业务模块各自放在独立仓库中，本仓库只承载核心；旧 vtuber-* 仓库只读保留，不修改、不删除、不搬迁。
 

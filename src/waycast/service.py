@@ -6,8 +6,8 @@ announce their capabilities, and exchange wire frames.  Every input - module
 worker, so backpressure is globally consistent (ADR-0006).  A single worker
 consumes inputs one at a time, runs the Agent invocation, and dispatches output
 units back to the owning module connections.  Module "result" frames form
-the one-shot output-results feed delivered to the next invocation
-(ADR-0002 / ADR-0013).
+the one-shot output-results feed mounted on the next invocation's input
+message (ADR-0002 / ADR-0014).
 
 WebSocket is the only input channel.
 """

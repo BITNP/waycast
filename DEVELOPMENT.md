@@ -12,7 +12,7 @@
 - **JSON 输出优先，否则自动回退**：Pydantic schema 直接传给 `create_agent` 的 `response_format`，LangChain v1 的 `AutoStrategy` 自动探测——provider 原生支持结构化输出走 `ProviderStrategy`，否则回退 `ToolStrategy`（ADR-0003）。
 - **背压**：所有输入（无论来自哪个模块）进入同一个有界 `asyncio.Queue`，单消费者 worker 逐条处理；队列满时生产者阻塞（ADR-0006）。
 - **无输出模块时不空转**：worker 每次取输入前先看 capability catalog —— 没有已连接的输出模块时，直接丢弃该条输入（在 `/results` 记录 `last_skipped`），不调用真实模型；有输出模块后才执行 Invocation。
-- **输出结果一次性注入**：Invocation 开始前 drain 待送达的 Output result，由 capability-bridge 渲染进动态系统提示词（catalog/status 之后、rules 之前），恰好吃掉一次、不进对话历史；连续相同结果聚合计数（ADR-0002 / ADR-0013）。
+- **输出结果搭载下一轮输入**：Invocation 开始前 drain 待送达的 Output result，渲染后拼在本轮输入 human 消息的开头进入对话历史——每条结果恰好出现一次、随摘要老化；连续相同结果聚合计数（ADR-0002 / ADR-0014）。系统提示词不携带 feed，在模块增删之间逐字节静态（前缀缓存友好）。
 - **历史由内置摘要管理**：全局单线程历史逼近 `("tokens", 60000)` 或 `("messages", 240)` 时，LangChain 内置 `SummarizationMiddleware`（主模型）自动摘要压缩、保留最近 40 条（ADR-0005 / ADR-0013）；Unified input 以 human 消息进入历史。
 - **连接 token**：`WAYCAST_HUB_TOKEN` 共享密钥，模块在 WebSocket 握手（query 参数）时提交，校验通过才受理（A8）。token 为空时关闭鉴权。
 
@@ -70,14 +70,14 @@ PYTHONPATH=src .venv/bin/python -m pytest tests/ -q
 PYTHONPATH=src .venv/bin/python -m pytest tests/test_agent_real.py -q --run-real-model
 ```
 
-真实模型测试覆盖结构化输出（units 可为空）、多轮工具调用（模型必须调用真实 `get_time`）、可选状态工具往返、输出结果一次性进入下一轮（ADR-0002 / ADR-0013）。
+真实模型测试覆盖结构化输出（units 可为空）、多轮工具调用（模型必须调用真实 `get_time`）、可选状态工具往返、输出结果一次性搭载下一轮输入消息（ADR-0002 / ADR-0014）。
 
 ## 项目结构
 
 ```
 src/waycast/
   agent.py         Agent：create_agent + 结构化输出 + 单元派发 + 开轮 drain feed + 内置摘要
-  bridge.py        CapabilityBridge middleware：系统提示词装配（含feed临时注入） + 状态工具 + 单元路由
+  bridge.py        CapabilityBridge middleware：系统提示词静态装配 + 状态工具 + 单元路由
   capabilities.py  CapabilityCatalog：已连接模块的能力目录
   cli.py           waycast serve 入口
   config.py        环境变量 / .env 配置，构建 ChatOpenAI
@@ -85,8 +85,8 @@ src/waycast/
   wire.py          Wire 协议：JSON 帧信封 + capability 校验
   protocols.py     载荷模型：UnifiedInput / OutputUnit
   service.py       FastAPI + 有界背压队列 + 单消费者 worker
-  state.py         OutputResult / 一次性feed / results_as_text 聚合渲染
-  prompt_config.py 读取纯文本用户提示词，与模块目录、feed、规则拼接
+  state.py         OutputResult / 一次性feed / results_as_text 聚合 / input_content_with_feed 组装
+  prompt_config.py 读取纯文本用户提示词，与模块目录、状态工具、规则拼接
   tools.py         内置真实工具（get_time）
 examples/
   waycast_examples/ 参考模块客户端（cron_source / echo_bell / log_sink）+ connect_module

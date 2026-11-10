@@ -58,6 +58,14 @@ With the structured output, only describe which modules to deliver to and with
 what payload; the system (not you) dispatches the units."""
 
 
+def _extends(previous: list[Any], messages: list[Any]) -> bool:
+    """True when ``messages`` replays exactly ``previous`` and then continues
+    (identity or value equality), i.e. the conversation grew unrewritten."""
+    if len(messages) < len(previous):
+        return False
+    return all(old is new or old == new for old, new in zip(previous, messages))
+
+
 class CapabilityBridge(AgentMiddleware):
     """Middleware that injects the module catalog into the prompt and routes
     output units / status queries to connected modules."""
@@ -68,11 +76,22 @@ class CapabilityBridge(AgentMiddleware):
         *,
         user_system_prompt: str | None = None,
         default_rules: str = DEFAULT_RULES,
+        llm_log_messages: str = "incremental",
     ) -> None:
         super().__init__()
         self.catalog = catalog
         self.user_system_prompt = user_system_prompt
         self.default_rules = default_rules
+        normalized_log_mode = llm_log_messages.strip().lower()
+        if normalized_log_mode not in ("incremental", "full"):
+            LOGGER.warning(
+                "unknown llm_log_messages %r, falling back to 'incremental'",
+                llm_log_messages,
+            )
+            normalized_log_mode = "incremental"
+        self._log_full_messages = normalized_log_mode == "full"
+        # The message list logged by the previous request, for incremental mode.
+        self._logged_messages: list[Any] = []
         self._adispatch: (
             Callable[[str, dict[str, Any]], Awaitable[OutputResult]] | None
         ) = None
@@ -146,10 +165,18 @@ class CapabilityBridge(AgentMiddleware):
 
     # -- debugging logs ----------------------------------------------------
 
-    @staticmethod
-    def _log_request(request: ModelRequest) -> None:
+    def _log_request(self, request: ModelRequest) -> None:
         """Log what is sent to the model (system prompt is assembled per-call;
-        keep the request log to the conversation, not the static prompt)."""
+        keep the request log to the conversation, not the static prompt).
+
+        The LLM API is stateless, so every request carries the whole history
+        again.  In the default ``incremental`` mode only the messages the
+        previous request did not already log are printed: repeating the whole
+        history on every request made one old input look like many inputs
+        (2026-11-10 实机日志复盘).  A request whose list does not extend the
+        logged prefix (first request, summarization rewrite...) logs the full
+        list again; ``full`` keeps the per-request full dump.
+        """
         system_chars = (
             len(request.system_message.content)
             if request.system_message is not None
@@ -162,8 +189,20 @@ class CapabilityBridge(AgentMiddleware):
             system_chars,
             [getattr(t, "name", str(t)) for t in request.tools],
         )
-        for message in request.messages:
+        messages = list(request.messages)
+        new_messages = messages
+        if not self._log_full_messages and _extends(self._logged_messages, messages):
+            new_messages = messages[len(self._logged_messages) :]
+        self._logged_messages = messages
+        for message in new_messages:
             LOGGER.debug("llm request message %s: %r", message.type, message.content)
+        collapsed = len(messages) - len(new_messages)
+        if collapsed:
+            LOGGER.debug(
+                "llm request: %d earlier message(s) unchanged "
+                "(WAYCAST_LLM_LOG_MESSAGES=full logs all)",
+                collapsed,
+            )
 
     @staticmethod
     def _log_response(response: ModelResponse) -> None:

@@ -88,6 +88,7 @@ class Agent:
         thread_id: str = "waycast-global",
         user_system_prompt: str | None = None,
         base_system_prompt: str | None = None,
+        llm_log_messages: str = "incremental",
     ) -> None:
         if args:
             raise TypeError(
@@ -103,6 +104,7 @@ class Agent:
         self.bridge = CapabilityBridge(
             catalog,
             user_system_prompt=user_system_prompt,
+            llm_log_messages=llm_log_messages,
         )
         base = base_system_prompt or BASE_SYSTEM_PROMPT
         # create_agent 的图类型带未定型泛型参数（库限制），此处按 Any 承载，

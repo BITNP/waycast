@@ -58,6 +58,7 @@ def _build_app(config: WaycastConfig):
         tools=default_tools(),
         thread_id=config.thread_id,
         user_system_prompt=read_user_system_prompt(),
+        llm_log_messages=config.llm_log_messages,
     )
     return Service(
         agent=agent,

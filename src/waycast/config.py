@@ -30,6 +30,9 @@ class WaycastConfig:
     host: str = "0.0.0.0"
     port: int = 8000
     thread_id: str = "waycast-global"
+    # LLM 请求消息的 DEBUG 记录方式：incremental 只打相对上次请求新增的消息，
+    # full 每次全量打（校验与回退在 CapabilityBridge，见 bridge.py）。
+    llm_log_messages: str = "incremental"
 
     @classmethod
     def from_env(cls):
@@ -42,6 +45,7 @@ class WaycastConfig:
             host=os.getenv("WAYCAST_HOST", "0.0.0.0"),
             port=int(os.getenv("WAYCAST_PORT", "8000")),
             thread_id=os.getenv("WAYCAST_THREAD_ID", "waycast-global"),
+            llm_log_messages=os.getenv("WAYCAST_LLM_LOG_MESSAGES", "incremental"),
         )
 
 

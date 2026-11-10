@@ -127,3 +127,9 @@ hub 端口不是 8000 时用 `--hub ws://127.0.0.1:<port>` 指定；配了 `WAYC
 **中文名「道枢」**出自《庄子·齐物论》：「彼是莫得其偶，谓之道枢。枢始得其环中，以应无穷。」——枢，门轴也，是 hub 的中文本字；「环中」是圆环的空心处，立于其中便可应对外界的无穷变化。这恰好是三件事的合一：hub 立于输入与输出的环心，应答无穷的请求；圆环是 **π**——树莓娘的「树莓」兼指树莓派 Raspberry Pi，无限不循环恰似一场不会自我重复的对话；而「道枢」二字逐字对译 waycast：道＝way，枢＝hub。
 
 命名族全谱（waycast 道枢 / aria 云和 / loom 机杼 / lumen 显影）见 [ADR-0015](docs/adr/0015-raspberrygirl-naming-family.md) 与 [GLOSSARY](GLOSSARY.md)「命名族」。
+
+## 许可证
+
+Copyright © 2026 北京理工大学网络开拓者协会（BITNP）。本仓库以 **AGPL-3.0-or-later** 发布（全文见 [LICENSE](LICENSE)：[SPDX](https://spdx.org/licenses/AGPL-3.0-or-later.html)）：可自由使用、修改、分发；但修改版以分发或网络服务方式对外提供时，必须以同许可整体开源（AGPL 的网络条款）。
+
+树莓娘（Raspberry Girl）名称、形象与相关美术资产为网协专有，**不适用本许可证**。

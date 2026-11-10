@@ -3,6 +3,7 @@ name = "waycast"
 version = "0.1.0"
 description = "A pluggable agent service: unified input in, arbitrary combination of output-module units out, fire-and-forget delivery with immediate results feeding the next invocation."
 readme = "README.md"
+license = "AGPL-3.0-or-later"
 requires-python = ">=3.12"
 authors = [
     { name = "noteas", email = "3818384646@qq.com" }

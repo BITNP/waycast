@@ -31,6 +31,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Any
 
 from langchain.agents.middleware import (
@@ -39,7 +40,7 @@ from langchain.agents.middleware import (
     ModelResponse,
     ToolCallRequest,
 )
-from langchain_core.messages import SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
 from langchain_core.tools import tool
 from langgraph.types import Command
 
@@ -64,6 +65,27 @@ def _extends(previous: list[Any], messages: list[Any]) -> bool:
     if len(messages) < len(previous):
         return False
     return all(old is new or old == new for old, new in zip(previous, messages))
+
+
+def _percent(part: int, whole: int) -> str:
+    return f"{part / whole:.1%}" if whole > 0 else "n/a"
+
+
+@dataclass
+class _UsageTotals:
+    """Process-cumulative LLM token usage, logged with every response so the
+    KV(prompt)-cache hit rate and thinking-token burn are readable without
+    summing per-request lines by hand (2026-11-10 实机复盘)."""
+
+    calls: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    reasoning_tokens: int = 0
+    cache_read: int = 0
+    # Sum of input tokens of the responses that reported a cache_read value;
+    # the cache-rate denominator, so providers that never report caching do not
+    # dilute the hit rate toward 0.
+    cache_input: int = 0
 
 
 class CapabilityBridge(AgentMiddleware):
@@ -99,6 +121,7 @@ class CapabilityBridge(AgentMiddleware):
             None
         )
         self._status_tool_impls: dict[str, Callable[[], Awaitable[str]]] = {}
+        self._usage_totals = _UsageTotals()
 
     # -- wiring ----------------------------------------------------------
 
@@ -204,8 +227,7 @@ class CapabilityBridge(AgentMiddleware):
                 collapsed,
             )
 
-    @staticmethod
-    def _log_response(response: ModelResponse) -> None:
+    def _log_response(self, response: ModelResponse) -> None:
         for result in response.result:
             tool_calls = getattr(result, "tool_calls", None)
             if tool_calls:
@@ -214,12 +236,72 @@ class CapabilityBridge(AgentMiddleware):
                     [(tc.get("name"), tc.get("args")) for tc in tool_calls],
                 )
             LOGGER.debug("llm response %s: %r", result.type, result.content)
+            if isinstance(result, AIMessage):
+                self._log_usage(result)
         if response.structured_response is not None:
             LOGGER.debug(
                 "llm response structured: %s",
                 json.dumps(
                     response.structured_response, ensure_ascii=False, default=str
                 ),
+            )
+
+    def _log_usage(self, message: AIMessage) -> None:
+        """Log one response's token usage plus process-cumulative totals.
+
+        This is the only visible trace of provider-side behaviour that makes a
+        request slow or cheap in the DEBUG log: ``reasoning_tokens`` attributes
+        a 60s+ request to a thinking mode the waycast config never asked for,
+        and ``cached=<n> cache_hit=<rate>`` shows how much of the replayed
+        prompt the provider's KV(prompt) cache actually served.  Silent while
+        the provider returns no usage at all.
+        """
+        usage = message.usage_metadata
+        if usage is None:
+            return
+        parts = [f"in={usage['input_tokens']}", f"out={usage['output_tokens']}"]
+        output_details = usage.get("output_token_details")
+        reasoning = output_details.get("reasoning") if output_details else None
+        if reasoning:
+            parts.append(f"reasoning_tokens={reasoning}")
+        reasoning_text = message.additional_kwargs.get("reasoning_content")
+        if isinstance(reasoning_text, str) and reasoning_text:
+            parts.append(f"reasoning_chars={len(reasoning_text)}")
+        input_details = usage.get("input_token_details")
+        cached = input_details.get("cache_read") if input_details else None
+        if cached is not None:
+            parts.append(
+                f"cached={cached} cache_hit={_percent(cached, usage['input_tokens'])}"
+            )
+        LOGGER.debug("llm response usage: %s", " ".join(parts))
+
+        totals = self._usage_totals
+        totals.calls += 1
+        totals.input_tokens += usage["input_tokens"]
+        totals.output_tokens += usage["output_tokens"]
+        totals.reasoning_tokens += reasoning or 0
+        if cached is not None:
+            totals.cache_read += cached
+            totals.cache_input += usage["input_tokens"]
+        if totals.cache_input:
+            LOGGER.debug(
+                "llm usage totals: calls=%d in=%d out=%d reasoning=%d "
+                "cache_hit=%s (%d/%d prompt tokens)",
+                totals.calls,
+                totals.input_tokens,
+                totals.output_tokens,
+                totals.reasoning_tokens,
+                _percent(totals.cache_read, totals.cache_input),
+                totals.cache_read,
+                totals.cache_input,
+            )
+        else:
+            LOGGER.debug(
+                "llm usage totals: calls=%d in=%d out=%d reasoning=%d",
+                totals.calls,
+                totals.input_tokens,
+                totals.output_tokens,
+                totals.reasoning_tokens,
             )
 
     # -- runtime status tools (A15/A19) ----------------------------------
